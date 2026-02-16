@@ -10,20 +10,11 @@ testAnalysis(name, onlyPlots = FALSE)
 \item{name}{String name of the analysis to test (case sensitive).}
 
 \item{onlyPlots}{Would you like to only run the tests for plots? This can speed up the generating of reference images in case you are not interested in the other unit tests.}
-<<<<<<< Updated upstream
-=======
-
-\item{includeExamples}{Logical. If TRUE (default), also runs any
-\code{test-{library,verified,other}-*.R} files that contain the analysis.
-Set to FALSE to only run the standard test file.}
->>>>>>> Stashed changes
 }
 \description{
 Tests a specific R analysis found under module/tests/testthat. Useful to perform before
 making a pull request, to prevent failing builds.
 }
-<<<<<<< Updated upstream
-=======
 \details{
 In addition to the standard test file (e.g., \code{test-AnalysisName.R}), this function
 also discovers auto-generated source-based test files (\code{test-library-*.R},
@@ -31,7 +22,6 @@ also discovers auto-generated source-based test files (\code{test-library-*.R},
 \code{runAnalysis("AnalysisName", ...)} calls. This ensures that tests
 created by \code{\link{makeTestsFromExamples}} are included when testing an analysis.
 }
->>>>>>> Stashed changes
 \examples{
 
 testAnalysis("AnovaBayesian")
