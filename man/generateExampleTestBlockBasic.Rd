@@ -9,6 +9,7 @@ generateExampleTestBlockBasic(
   analysisIndex,
   totalAnalyses,
   jaspFileName,
+  sourceFolder,
   forceEncode = NULL
 )
 }
@@ -20,6 +21,9 @@ generateExampleTestBlockBasic(
 \item{totalAnalyses}{Total number of analyses in the file.}
 
 \item{jaspFileName}{Name of the JASP file.}
+
+\item{sourceFolder}{String indicating the source folder: \code{"library"},
+\code{"verified"}, or \code{"other"}.}
 
 \item{forceEncode}{Optional character vector of option names to force-encode via regex.}
 }

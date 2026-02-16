@@ -9,6 +9,7 @@ generateExampleTestBlock(
   analysisIndex,
   totalAnalyses,
   jaspFileName,
+  sourceFolder,
   results,
   forceEncode = NULL
 )
@@ -21,6 +22,9 @@ generateExampleTestBlock(
 \item{totalAnalyses}{Total number of analyses in the file.}
 
 \item{jaspFileName}{Name of the JASP file.}
+
+\item{sourceFolder}{String indicating the source folder: \code{"library"},
+\code{"verified"}, or \code{"other"}.}
 
 \item{results}{The analysis results.}
 
