@@ -7,6 +7,7 @@
 makeTestsFromExamples(
   path,
   module.dir,
+  source,
   sanitize = FALSE,
   overwrite = FALSE,
   forceEncode = NULL
@@ -15,11 +16,19 @@ makeTestsFromExamples(
 \arguments{
 \item{path}{Optional string path to a directory containing JASP example files.
 If provided, the JASP files at this path will be copied to the module's
-\code{examples/} folder before generating tests. If missing, the function processes
-JASP files already present in the module's \code{examples/} folder.}
+\code{tests/testthat/jaspfiles/other/} folder and test files named
+\code{test-other-{name}.R} are generated. The \code{source} argument is
+ignored when \code{path} is provided.}
 
 \item{module.dir}{String path to the module directory. If missing, uses the current
 working directory.}
+
+\item{source}{Character vector specifying which source folders under
+\code{tests/testthat/jaspfiles/} to process. Allowed values are
+\code{"library"}, \code{"verified"}, and \code{"other"}. Defaults to all
+three when \code{overwrite = FALSE} and to \code{c("library", "other")}
+when \code{overwrite = TRUE}. If \code{"verified"} is included and
+\code{overwrite = TRUE}, the user is prompted for confirmation.}
 
 \item{sanitize}{Logical. If TRUE, sanitizes test filenames by replacing non-word characters
 with hyphens. If FALSE (default), preserves original spacing and characters in filenames.}
@@ -40,14 +49,12 @@ Invisibly returns a character vector of created/processed test file paths.
 \code{makeTestsFromExamples} transforms JASP example files into unit test files.
 }
 \details{
-This function processes JASP example files and generates corresponding test files in
-the module's \code{tests/testthat} directory. Each JASP file becomes a single test file
-named "test-example-{basename}.R", where {basename} is the original JASP filename without
-the .jasp extension.
-
-The JASP example files must be located in the module's \code{examples/} folder for the
-generated tests to work at runtime. When \code{path} is provided, files are automatically
-copied to the module's \code{examples/} folder.
+This function processes JASP example files stored under
+\code{tests/testthat/jaspfiles/{library,verified,other}/} and generates corresponding
+test files in the module's \code{tests/testthat} directory. Each JASP file becomes a
+single test file named \code{test-{source}-{basename}.R}, where \code{{source}} is the
+source folder name (\code{library}, \code{verified}, or \code{other}) and \code{{basename}}
+is the original JASP filename without the .jasp extension.
 
 If a JASP file contains multiple analyses, they are included as separate \code{test_that()}
 blocks within the same test file.
@@ -64,17 +71,19 @@ blocks within the same test file.
 library(jaspTools)
 setupJaspTools()
 
-# Create tests from JASP files already in the module's examples/ folder
-# (uses working directory as module)
+# Create tests from all source folders (library, verified, other)
 makeTestsFromExamples()
 
 # Specify the module directory explicitly
 makeTestsFromExamples(module.dir = "path/to/your/module")
 
-# Import JASP files from another directory, copy to examples/, and generate tests
+# Only generate tests from the 'library' source folder
+makeTestsFromExamples(source = "library")
+
+# Import JASP files from another directory (copies to jaspfiles/other/)
 makeTestsFromExamples(path = "path/to/jasp/files", module.dir = "path/to/module")
 
-# Overwrite existing test files
+# Overwrite existing test files (skips verified by default)
 makeTestsFromExamples(overwrite = TRUE)
 
 # Force encode 'model' option for analyses with embedded variable names

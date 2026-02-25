@@ -33,6 +33,11 @@ runTestsTravis <- function(modulePath) {
 #' Tests a specific R analysis found under module/tests/testthat. Useful to perform before
 #' making a pull request, to prevent failing builds.
 #'
+#' In addition to the standard test file (e.g., \code{test-AnalysisName.R}), this function
+#' also discovers auto-generated source-based test files (\code{test-library-*.R},
+#' \code{test-verified-*.R}, \code{test-other-*.R}) that contain
+#' \code{runAnalysis("AnalysisName", ...)} calls. This ensures that tests
+#' created by \code{\link{makeTestsFromExamples}} are included when testing an analysis.
 #'
 #' @param name String name of the analysis to test (case sensitive).
 #' @param onlyPlots Would you like to only run the tests for plots? This can speed up the generating of reference images in case you are not interested in the other unit tests.
@@ -290,14 +295,27 @@ getTestFilesMatchingName <- function(name, modulePath) {
   if (length(testFiles) == 0)
     stop("No files found to test.")
 
-  analysisNames <- gsub("^test-(verified-)?", "", testFiles)
+  # Pass 1: match by file name (e.g., test-AnalysisName.R)
+  analysisNames <- gsub("^test-(verified-|library-|other-)?", "", testFiles)
   analysisNames <- gsub("\\.[rR]$", "", analysisNames)
-
   matches <- which(tolower(basename(analysisNames)) == tolower(name))
-  if (length(matches) == 0)
-    stop("Could not locate test-", name, ".R, found the following testfiles: ", paste(basename(testFiles), collapse =  ", "))
+  matchedFiles <- testFiles[matches]
 
-  return(testFiles[matches])
+  # Pass 2: scan test-{library,verified,other}-* files for runAnalysis("name", ...) calls
+  sourceFiles <- testFiles[grepl("^test-(library|verified|other)-.*\\.[rR]$", testFiles)]
+  sourceFiles <- setdiff(sourceFiles, matchedFiles)
+  escapedName <- gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", name)
+  pattern <- paste0('runAnalysis\\(\\s*["\']', escapedName, '["\']')
+  for (ef in sourceFiles) {
+    content <- readLines(file.path(testsDir, ef), warn = FALSE)
+    if (any(grepl(pattern, content)))
+      matchedFiles <- c(matchedFiles, ef)
+  }
+
+  if (length(matchedFiles) == 0)
+    stop("Could not locate test file for ", name, ". Found the following test files: ", paste(basename(testFiles), collapse = ", "))
+
+  return(matchedFiles)
 }
 
 printSuccessFailureModules <- function(testResults) {

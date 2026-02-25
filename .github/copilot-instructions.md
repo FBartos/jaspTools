@@ -98,26 +98,39 @@ The encoding process:
 Use `makeTestsFromExamples()` to automatically generate test files from JASP example files:
  
 ```r
-# Generate tests from JASP files in the module's examples/ folder
+# Generate tests from all source folders (library, verified, other)
 # Uses working directory as module by default
 makeTestsFromExamples()
 
-# Specify module directory explicitly
+# Specify the module directory explicitly
 makeTestsFromExamples(module.dir = "path/to/jaspModule")
 
-# Import JASP files from external path, copy to examples/, and generate tests
+# Only generate from the 'library' source folder
+makeTestsFromExamples(source = "library")
+
+# Import JASP files from external path (copies to jaspfiles/other/ and generates tests)
 makeTestsFromExamples(path = "path/to/jasp/files", module.dir = "path/to/module")
 
-# Overwrite existing test files
+# Overwrite existing test files (skips verified by default)
 makeTestsFromExamples(overwrite = TRUE)
+
+# Overwrite including verified (prompts for confirmation)
+makeTestsFromExamples(source = c("library", "verified", "other"), overwrite = TRUE)
 
 # Sanitize filenames (replace spaces/special chars with hyphens)
 makeTestsFromExamples(sanitize = TRUE)
 ```
 
+**Source Folders**: JASP example files are stored in `tests/testthat/jaspfiles/{library,verified,other}/`. The `source` argument controls which folders to process:
+- `"library"` — JASP files from the analysis library
+- `"verified"` — Manually verified/curated test files
+- `"other"` — Other/imported JASP files (default target for `path` imports)
+
+**Defaults**: When `overwrite = FALSE` (default), all three sources are processed. When `overwrite = TRUE`, only `"library"` and `"other"` are processed to protect verified tests.
+
 Generated test files:
-- Named `test-example-{filename}.R` in `tests/testthat/`
-- Load options and data from JASP files at runtime
+- Named `test-{source}-{filename}.R` in `tests/testthat/` (e.g., `test-library-MyAnalysis.R`)
+- Load options and data from JASP files at runtime via `testthat::test_path("jaspfiles", "{source}", "file.jasp")`
 - Include table expectations via `expect_equal_tables()`
 - Include plot expectations via `expect_equal_plots()` with unique names: `analysis-1_figure-1_plot-title`
 
@@ -191,7 +204,7 @@ Check versions with `.checkUpdatesJaspCorePkgs()` on package load.
 - `R/rbridge.R`: RCPP bridge replacements (`.readDatasetToEndNative`, `.requestTempFileNameNative`, etc.)
 - `R/pkg-setup.R`: Initial setup, dependency fetching
 - `R/utils.R`: Module path resolution, validation, helper functions
-- `R/test-generator.R`: Auto-generate test expectations from results, `makeTestsFromExamples()`
+- `R/test-generator.R`: Auto-generate test expectations from results, `makeTestsFromExamples()`. JASP files live in `tests/testthat/jaspfiles/{library,verified,other}/`; generated tests are named `test-{source}-{name}.R`.
 - `R/testthat-helper-*.R`: Custom `expect_equal_tables()` and `expect_equal_plots()`
 
 ## Debugging Tips

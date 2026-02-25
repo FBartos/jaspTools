@@ -7,9 +7,10 @@
 makeTestsFromSingleJASPFile(
   jaspFile,
   module.dir,
+  sourceFolder,
   sanitize = FALSE,
   overwrite = FALSE,
-  copyToExamples = FALSE,
+  copyToJaspfiles = FALSE,
   pkgAnalyses = NULL,
   forceEncode = NULL
 )
@@ -19,11 +20,15 @@ makeTestsFromSingleJASPFile(
 
 \item{module.dir}{Path to the module directory.}
 
+\item{sourceFolder}{String indicating the source folder: \code{"library"},
+\code{"verified"}, or \code{"other"}.}
+
 \item{sanitize}{Whether to sanitize the filename.}
 
 \item{overwrite}{Whether to overwrite existing test files.}
 
-\item{copyToExamples}{Whether to copy the JASP file to the module's examples folder.}
+\item{copyToJaspfiles}{Whether to copy the JASP file to
+\code{tests/testthat/jaspfiles/{sourceFolder}/}.}
 
 \item{pkgAnalyses}{Optional character vector of allowed analysis names for this module.
 If provided, analyses not in this list will be skipped.}

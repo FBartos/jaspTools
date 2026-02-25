@@ -4,10 +4,17 @@
 #'
 #' @param path Optional string path to a directory containing JASP example files.
 #'   If provided, the JASP files at this path will be copied to the module's
-#'   \code{examples/} folder before generating tests. If missing, the function processes
-#'   JASP files already present in the module's \code{examples/} folder.
+#'   \code{tests/testthat/jaspfiles/other/} folder and test files named
+#'   \code{test-other-{name}.R} are generated. The \code{source} argument is
+#'   ignored when \code{path} is provided.
 #' @param module.dir String path to the module directory. If missing, uses the current
 #'   working directory.
+#' @param source Character vector specifying which source folders under
+#'   \code{tests/testthat/jaspfiles/} to process. Allowed values are
+#'   \code{"library"}, \code{"verified"}, and \code{"other"}. Defaults to all
+#'   three when \code{overwrite = FALSE} and to \code{c("library", "other")}
+#'   when \code{overwrite = TRUE}. If \code{"verified"} is included and
+#'   \code{overwrite = TRUE}, the user is prompted for confirmation.
 #' @param sanitize Logical. If TRUE, sanitizes test filenames by replacing non-word characters
 #'   with hyphens. If FALSE (default), preserves original spacing and characters in filenames.
 #' @param overwrite Logical. If TRUE, overwrites existing test files. If FALSE (default),
@@ -19,14 +26,12 @@
 #'   column names replaced with their encoded equivalents using word-boundary-aware regex.
 #'
 #' @details
-#' This function processes JASP example files and generates corresponding test files in
-#' the module's \code{tests/testthat} directory. Each JASP file becomes a single test file
-#' named "test-example-{basename}.R", where {basename} is the original JASP filename without
-#' the .jasp extension.
-#'
-#' The JASP example files must be located in the module's \code{examples/} folder for the
-#' generated tests to work at runtime. When \code{path} is provided, files are automatically
-#' copied to the module's \code{examples/} folder.
+#' This function processes JASP example files stored under
+#' \code{tests/testthat/jaspfiles/{library,verified,other}/} and generates corresponding
+#' test files in the module's \code{tests/testthat} directory. Each JASP file becomes a
+#' single test file named \code{test-{source}-{basename}.R}, where \code{{source}} is the
+#' source folder name (\code{library}, \code{verified}, or \code{other}) and \code{{basename}}
+#' is the original JASP filename without the .jasp extension.
 #'
 #' If a JASP file contains multiple analyses, they are included as separate \code{test_that()}
 #' blocks within the same test file.
@@ -43,17 +48,19 @@
 #' library(jaspTools)
 #' setupJaspTools()
 #'
-#' # Create tests from JASP files already in the module's examples/ folder
-#' # (uses working directory as module)
+#' # Create tests from all source folders (library, verified, other)
 #' makeTestsFromExamples()
 #'
 #' # Specify the module directory explicitly
 #' makeTestsFromExamples(module.dir = "path/to/your/module")
 #'
-#' # Import JASP files from another directory, copy to examples/, and generate tests
+#' # Only generate tests from the 'library' source folder
+#' makeTestsFromExamples(source = "library")
+#'
+#' # Import JASP files from another directory (copies to jaspfiles/other/)
 #' makeTestsFromExamples(path = "path/to/jasp/files", module.dir = "path/to/module")
 #'
-#' # Overwrite existing test files
+#' # Overwrite existing test files (skips verified by default)
 #' makeTestsFromExamples(overwrite = TRUE)
 #'
 #' # Force encode 'model' option for analyses with embedded variable names
@@ -61,17 +68,18 @@
 #' }
 #'
 #' @export makeTestsFromExamples
-makeTestsFromExamples <- function(path, module.dir, sanitize = FALSE, overwrite = FALSE,
-                                  forceEncode = NULL) {
-  # Determine module directory
+makeTestsFromExamples <- function(path, module.dir, source, sanitize = FALSE,
+                                  overwrite = FALSE, forceEncode = NULL) {
+  validSources <- c("library", "verified", "other")
 
+  # Determine module directory
   if (missing(module.dir)) {
     module.dir <- getwd()
-    message("Using working directory as module: ", module.dir)
+    cli::cli_inform("Using working directory as module: {.path {module.dir}}")
   }
 
   if (!dir.exists(module.dir)) {
-    stop("Module directory does not exist: ", module.dir)
+    cli::cli_abort("Module directory does not exist: {.path {module.dir}}")
   }
 
   pkgAnalyses <- NULL
@@ -85,55 +93,161 @@ makeTestsFromExamples <- function(path, module.dir, sanitize = FALSE, overwrite 
     qmlContent <- parseDescriptionQmlFromPath(qmlPath)
     pkgAnalyses <- setdiff(names(qmlContent), "Description")
   } else {
-    stop("Description.qml not found at path: ", qmlPath, 
-         ". Make sure the module contains inst/Description.qml (source) or Description.qml (installed).")
+    cli::cli_abort(c(
+      "{.file Description.qml} not found at path: {.path {qmlPath}}.",
+      "i" = "Make sure the module contains {.file inst/Description.qml} (source) or {.file Description.qml} (installed)."
+    ))
   }
 
-
-  # Collect JASP files to process
-  jaspFiles <- character(0)
-  copyToExamples <- FALSE
-
+  # When path is provided, always target "other" and ignore source
   if (!missing(path)) {
-    # Path provided: collect files from this path and mark them for copying
     if (!dir.exists(path)) {
-      stop("Directory does not exist: ", path)
+      cli::cli_abort("Directory does not exist: {.path {path}}")
     }
 
     jaspFiles <- list.files(path, pattern = "\\.jasp$", full.names = TRUE)
     if (length(jaspFiles) == 0) {
-      stop("No .jasp files found in directory: ", path)
+      cli::cli_abort("No {.file .jasp} files found in directory: {.path {path}}")
     }
 
-    copyToExamples <- TRUE
-    message("Will copy JASP files to module examples/ folder before generating tests.\n")
-  } else {
-    # No path provided: collect files from module's examples/ folder
-    examplesDir <- file.path(module.dir, "examples")
-    if (dir.exists(examplesDir)) {
-      jaspFiles <- list.files(examplesDir, pattern = "\\.jasp$", full.names = TRUE)
+    # Ensure destination directory exists
+    otherDir <- file.path(module.dir, "tests", "testthat", "jaspfiles", "other")
+    if (!dir.exists(otherDir)) {
+      dir.create(otherDir, recursive = TRUE)
     }
 
-    if (length(jaspFiles) == 0) {
-      stop("No .jasp files found in module's examples/ folder: ", examplesDir)
+    cli::cli_h2("Copying JASP files to {.path tests/testthat/jaspfiles/other/} and generating tests")
+
+    result <- .processJaspFiles(jaspFiles,
+      module.dir      = module.dir,
+      sourceFolder    = "other",
+      sanitize        = sanitize,
+      overwrite       = overwrite,
+      copyToJaspfiles = TRUE,
+      pkgAnalyses     = pkgAnalyses,
+      forceEncode     = forceEncode
+    )
+
+    .printTestGenerationSummary(result$created, result$skipped, result$copied, "other")
+    return(invisible(result$created))
+  }
+
+  # No path provided: process source folders
+  if (missing(source)) {
+    if (overwrite) {
+      source <- c("library", "other")
+    } else {
+      source <- validSources
+    }
+  }
+
+  source <- match.arg(source, validSources, several.ok = TRUE)
+
+  # Warn if overwriting verified tests
+  if (overwrite && "verified" %in% source) {
+    if (interactive()) {
+      answer <- utils::menu(
+        choices = c("Yes", "No"),
+        title   = "WARNING: You are about to overwrite verified test files. Are you sure?"
+      )
+      if (answer != 1) {
+        cli::cli_alert_danger("Aborted. Remove {.val verified} from {.arg source} or set {.code overwrite = FALSE}.")
+        return(invisible(character(0)))
+      }
+    } else {
+      cli::cli_warn("Overwriting verified test files in non-interactive mode.")
     }
   }
 
   createdFiles <- character(0)
   skippedFiles <- character(0)
-  copiedFiles <- character(0)
+
+  for (src in source) {
+    srcDir <- file.path(module.dir, "tests", "testthat", "jaspfiles", src)
+
+    if (!dir.exists(srcDir)) {
+      cli::cli_alert_info("Source folder does not exist, skipping: {.path {srcDir}}")
+      next
+    }
+
+    jaspFiles <- list.files(srcDir, pattern = "\\.jasp$", full.names = TRUE)
+    if (length(jaspFiles) == 0) {
+      cli::cli_alert_info("No .jasp files found in: {.path {srcDir}}")
+      next
+    }
+
+    cli::cli_h2("Processing source: {.val {src}} ({length(jaspFiles)} file{?s})")
+
+    result <- .processJaspFiles(jaspFiles,
+      module.dir      = module.dir,
+      sourceFolder    = src,
+      sanitize        = sanitize,
+      overwrite       = overwrite,
+      copyToJaspfiles = FALSE,
+      pkgAnalyses     = pkgAnalyses,
+      forceEncode     = forceEncode
+    )
+    createdFiles <- c(createdFiles, result$created)
+    skippedFiles <- c(skippedFiles, result$skipped)
+  }
+
+  .printTestGenerationSummary(createdFiles, skippedFiles, character(0), source)
+  invisible(createdFiles)
+}
+
+.printTestGenerationSummary <- function(createdFiles, skippedFiles, copiedFiles, sources) {
+  if (length(createdFiles) == 0 && length(skippedFiles) == 0) {
+    cli::cli_warn("No test files were created.")
+  } else {
+    cli::cli_h3("Summary")
+    bullets <- character(0)
+    if (length(copiedFiles) > 0) {
+      paths <- paste0("tests/testthat/jaspfiles/", sources, "/")
+      bullets <- c(bullets, stats::setNames(
+        paste0("Copied ", length(copiedFiles), " JASP file(s) to {.path ", paths, "}."),
+        "v"
+      ))
+    }
+    if (length(createdFiles) > 0) {
+      bullets <- c(bullets, stats::setNames(
+        paste0("Created ", length(createdFiles), " test file(s) from source{?s}: ",
+               "{.val {sources}}."),
+        "v"
+      ))
+    }
+    if (length(skippedFiles) > 0) {
+      bullets <- c(bullets, stats::setNames(
+        paste0("Skipped ", length(skippedFiles), " existing test file(s). Use {.code overwrite = TRUE} to regenerate."),
+        "!"
+      ))
+    }
+    cli::cli_bullets(bullets)
+  }
+}
+
+# Process a vector of JASP files: call makeTestsFromSingleJASPFile on each,
+# collect created/skipped/copied paths, and report per-file progress.
+# Returns a list with components $created, $skipped, $copied.
+.processJaspFiles <- function(jaspFiles, module.dir, sourceFolder, sanitize,
+                              overwrite, copyToJaspfiles, pkgAnalyses,
+                              forceEncode) {
+  createdFiles <- character(0)
+  skippedFiles <- character(0)
+  copiedFiles  <- character(0)
 
   for (jaspFile in jaspFiles) {
-    message("Processing: ", basename(jaspFile))
+    cli::cli_inform("Processing: {.file {basename(jaspFile)}}")
 
     tryCatch(
       {
         result <- makeTestsFromSingleJASPFile(jaspFile,
-          module.dir = module.dir,
-          sanitize = sanitize, overwrite = overwrite,
-          copyToExamples = copyToExamples,
-          pkgAnalyses = pkgAnalyses,
-          forceEncode = forceEncode
+          module.dir      = module.dir,
+          sourceFolder    = sourceFolder,
+          sanitize        = sanitize,
+          overwrite       = overwrite,
+          copyToJaspfiles = copyToJaspfiles,
+          pkgAnalyses     = pkgAnalyses,
+          forceEncode     = forceEncode
         )
         if (!is.null(result)) {
           if (!is.null(attr(result, "copiedTo"))) {
@@ -141,36 +255,22 @@ makeTestsFromExamples <- function(path, module.dir, sanitize = FALSE, overwrite 
           }
           if (isTRUE(attr(result, "skipped"))) {
             skippedFiles <- c(skippedFiles, result)
-            message("  Skipped (already exists): ", result)
+            cli::cli_alert_info("Skipped (already exists): {.file {result}}")
           } else {
             createdFiles <- c(createdFiles, result)
-            message("  Created: ", result)
+            cli::cli_alert_success("Created: {.file {result}}")
           }
         } else {
-          message("  No tests created (all analyses were skipped)")
+          cli::cli_alert_warning("No tests created (all analyses were skipped)")
         }
       },
       error = function(e) {
-        warning("Failed to process ", basename(jaspFile), ": ", e$message, call. = FALSE)
+        cli::cli_warn("Failed to process {.file {basename(jaspFile)}}: {e$message}")
       }
     )
   }
 
-  if (length(createdFiles) == 0 && length(skippedFiles) == 0) {
-    warning("No test files were created.")
-  } else {
-    if (length(copiedFiles) > 0) {
-      message("\nCopied ", length(copiedFiles), " JASP file(s) to module examples/ folder(s).")
-    }
-    if (length(createdFiles) > 0) {
-      message("Created ", length(createdFiles), " test file(s).")
-    }
-    if (length(skippedFiles) > 0) {
-      message("Skipped ", length(skippedFiles), " existing test file(s). Use overwrite = TRUE to regenerate.")
-    }
-  }
-
-  invisible(createdFiles)
+  list(created = createdFiles, skipped = skippedFiles, copied = copiedFiles)
 }
 
 
@@ -180,10 +280,12 @@ makeTestsFromExamples <- function(path, module.dir, sanitize = FALSE, overwrite 
 #'
 #' @param jaspFile Path to the .jasp file.
 #' @param module.dir Path to the module directory.
+#' @param sourceFolder String indicating the source folder: \code{"library"},
+#'   \code{"verified"}, or \code{"other"}.
 #' @param sanitize Whether to sanitize the filename.
 #' @param overwrite Whether to overwrite existing test files.
-#' @param copyToExamples Whether to copy the JASP file to the module's examples folder.
-#'
+#' @param copyToJaspfiles Whether to copy the JASP file to
+#'   \code{tests/testthat/jaspfiles/{sourceFolder}/}.
 #' @param pkgAnalyses Optional character vector of allowed analysis names for this module.
 #'   If provided, analyses not in this list will be skipped.
 #' @param forceEncode Optional character vector of option names to force-encode via regex.
@@ -192,8 +294,9 @@ makeTestsFromExamples <- function(path, module.dir, sanitize = FALSE, overwrite 
 #'   and attr "copiedTo" if copied), or NULL if no tests were generated
 #'   (e.g., all analyses were skipped or processing failed).
 #' @keywords internal
-makeTestsFromSingleJASPFile <- function(jaspFile, module.dir, sanitize = FALSE,
-                                        overwrite = FALSE, copyToExamples = FALSE,
+makeTestsFromSingleJASPFile <- function(jaspFile, module.dir, sourceFolder,
+                                        sanitize = FALSE, overwrite = FALSE,
+                                        copyToJaspfiles = FALSE,
                                         pkgAnalyses = NULL, forceEncode = NULL) {
   # Extract options from the JASP file
   allOptions <- analysisOptions(jaspFile)
@@ -223,17 +326,17 @@ makeTestsFromSingleJASPFile <- function(jaspFile, module.dir, sanitize = FALSE,
   # Track if we copied the file
   copiedTo <- NULL
 
-  # Copy JASP file to module's examples folder if requested
-  if (copyToExamples) {
-    examplesDir <- file.path(module.dir, "examples")
-    if (!dir.exists(examplesDir)) {
-      dir.create(examplesDir, recursive = TRUE)
-      message("  Created directory: ", examplesDir)
+  # Copy JASP file to module's jaspfiles/{sourceFolder}/ if requested
+  if (copyToJaspfiles) {
+    destDir <- file.path(module.dir, "tests", "testthat", "jaspfiles", sourceFolder)
+    if (!dir.exists(destDir)) {
+      dir.create(destDir, recursive = TRUE)
+      cli::cli_alert_info("Created directory: {.path {destDir}}")
     }
-    destFile <- file.path(examplesDir, basename(jaspFile))
+    destFile <- file.path(destDir, basename(jaspFile))
     file.copy(jaspFile, destFile, overwrite = TRUE)
     copiedTo <- destFile
-    message("  Copied to: ", destFile)
+    cli::cli_alert_success("Copied to: {.file {destFile}}")
   }
 
   # Create tests/testthat directory if needed
@@ -241,11 +344,11 @@ makeTestsFromSingleJASPFile <- function(jaspFile, module.dir, sanitize = FALSE,
 
   if (!dir.exists(testDir)) {
     dir.create(testDir, recursive = TRUE)
-    message("  Created directory: ", testDir)
+    cli::cli_alert_info("Created directory: {.path {testDir}}")
   }
 
-  # Determine test file path using "test-example-Name.R" format
-  testFileName <- paste0("test-example-", sanitizedName, ".R")
+  # Determine test file path using "test-{sourceFolder}-Name.R" format
+  testFileName <- paste0("test-", sourceFolder, "-", sanitizedName, ".R")
   testFilePath <- file.path(testDir, testFileName)
 
   # Check if file already exists
@@ -264,16 +367,16 @@ makeTestsFromSingleJASPFile <- function(jaspFile, module.dir, sanitize = FALSE,
     analysisName <- attr(opts, "analysisName")
 
     if (is.null(analysisName)) {
-      warning("Analysis ", i, " has no name, skipping")
+      cli::cli_warn("Analysis {i} has no name, skipping.")
       next
     }
 
     if (!is.null(pkgAnalyses) && !analysisName %in% pkgAnalyses) {
-      message("Analysis ", analysisName, " skipped because it is not exported from the current module.")
+      cli::cli_alert_info("Analysis {.val {analysisName}} skipped (not exported from the current module).")
       next
     }
 
-    message("  Running analysis ", i, "/", length(allOptions), ": ", analysisName)
+    cli::cli_inform("Running analysis {i}/{length(allOptions)}: {.val {analysisName}}")
 
     # Encode options and dataset
     encoded <- encodeOptionsAndDataset(opts, dataset, forceEncode = forceEncode)
@@ -292,6 +395,7 @@ makeTestsFromSingleJASPFile <- function(jaspFile, module.dir, sanitize = FALSE,
           analysisIndex = i,
           totalAnalyses = length(allOptions),
           jaspFileName = basename(jaspFile),
+          sourceFolder = sourceFolder,
           results = results,
           forceEncode = forceEncode
         )
@@ -299,13 +403,14 @@ makeTestsFromSingleJASPFile <- function(jaspFile, module.dir, sanitize = FALSE,
         testBlocks <- c(testBlocks, list(testBlock))
       },
       error = function(e) {
-        warning("  Failed to run analysis ", analysisName, ": ", e$message, call. = FALSE)
+        cli::cli_warn("Failed to run analysis {.val {analysisName}}: {e$message}")
         # Generate a basic test block that just checks for no error
         testBlock <- generateExampleTestBlockBasic(
           analysisName = analysisName,
           analysisIndex = i,
           totalAnalyses = length(allOptions),
           jaspFileName = basename(jaspFile),
+          sourceFolder = sourceFolder,
           forceEncode = forceEncode
         )
         testBlocks <<- c(testBlocks, list(testBlock))
@@ -319,7 +424,7 @@ makeTestsFromSingleJASPFile <- function(jaspFile, module.dir, sanitize = FALSE,
   }
 
   # Generate the test file content
-  testContent <- generateExampleTestFileContent(baseName, sanitizedName, testBlocks)
+  testContent <- generateExampleTestFileContent(baseName, sanitizedName, sourceFolder, testBlocks)
 
   # Write the test file
   writeLines(testContent, testFilePath)
@@ -331,24 +436,27 @@ makeTestsFromSingleJASPFile <- function(jaspFile, module.dir, sanitize = FALSE,
 }
 
 
-#' Generate test file content for example-based tests
+#' Generate test file content for source-based tests
 #'
 #' @param baseName Original JASP file name without extension.
 #' @param sanitizedName Sanitized name for use in code.
+#' @param sourceFolder String indicating the source folder: \code{"library"},
+#'   \code{"verified"}, or \code{"other"}.
 #' @param testBlocks List of test block strings.
 #'
 #' @return Character string with complete test file content.
 #' @keywords internal
-generateExampleTestFileContent <- function(baseName, sanitizedName, testBlocks) {
+generateExampleTestFileContent <- function(baseName, sanitizedName, sourceFolder, testBlocks) {
   lines <- character(0)
 
   # Header
-  lines <- c(lines, paste0('context("Example: ', baseName, '")'))
+  sourceLabelCap <- paste0(toupper(substring(sourceFolder, 1, 1)), substring(sourceFolder, 2))
+  lines <- c(lines, paste0('context("', sourceLabelCap, ': ', baseName, '")'))
   lines <- c(lines, "")
 
   # Helper comment
   lines <- c(lines, "# This test file was auto-generated from a JASP example file.")
-  lines <- c(lines, "# The JASP file is stored in the module's examples/ folder.")
+  lines <- c(lines, paste0("# The JASP file is stored in tests/testthat/jaspfiles/", sourceFolder, "/."))
   lines <- c(lines, "")
 
   # Add each test block
@@ -366,13 +474,15 @@ generateExampleTestFileContent <- function(baseName, sanitizedName, testBlocks) 
 #' @param analysisIndex Index of this analysis in the JASP file.
 #' @param totalAnalyses Total number of analyses in the file.
 #' @param jaspFileName Name of the JASP file.
+#' @param sourceFolder String indicating the source folder: \code{"library"},
+#'   \code{"verified"}, or \code{"other"}.
 #' @param results The analysis results.
 #' @param forceEncode Optional character vector of option names to force-encode via regex.
 #'
 #' @return Character string with the test_that block.
 #' @keywords internal
-generateExampleTestBlock <- function(analysisName, analysisIndex, totalAnalyses, jaspFileName, results,
-                                     forceEncode = NULL) {
+generateExampleTestBlock <- function(analysisName, analysisIndex, totalAnalyses, jaspFileName,
+                                     sourceFolder, results, forceEncode = NULL) {
   # Extract tests from results
   tests <- tryCatch(
     {
@@ -396,9 +506,9 @@ generateExampleTestBlock <- function(analysisName, analysisIndex, totalAnalyses,
   lines <- c(lines, paste0('test_that("', testDesc, '", {'))
   lines <- c(lines, "")
 
-  # Extract from JASP file in module's examples folder
+  # Extract from JASP file in module's jaspfiles folder
   lines <- c(lines, "  # Load from JASP example file")
-  lines <- c(lines, paste0('  jaspFile <- testthat::test_path("..", "..", "examples", "', jaspFileName, '")'))
+  lines <- c(lines, paste0('  jaspFile <- testthat::test_path("jaspfiles", "', sourceFolder, '", "', jaspFileName, '")'))
 
   # Generate appropriate options extraction based on number of analyses
   if (totalAnalyses == 1) {
@@ -466,12 +576,14 @@ generateExampleTestBlock <- function(analysisName, analysisIndex, totalAnalyses,
 #' @param analysisIndex Index of this analysis in the JASP file.
 #' @param totalAnalyses Total number of analyses in the file.
 #' @param jaspFileName Name of the JASP file.
+#' @param sourceFolder String indicating the source folder: \code{"library"},
+#'   \code{"verified"}, or \code{"other"}.
 #' @param forceEncode Optional character vector of option names to force-encode via regex.
 #'
 #' @return Character string with the test_that block.
 #' @keywords internal
 generateExampleTestBlockBasic <- function(analysisName, analysisIndex, totalAnalyses, jaspFileName,
-                                          forceEncode = NULL) {
+                                          sourceFolder, forceEncode = NULL) {
   lines <- character(0)
 
   # Test description
@@ -484,9 +596,9 @@ generateExampleTestBlockBasic <- function(analysisName, analysisIndex, totalAnal
   lines <- c(lines, paste0('test_that("', testDesc, '", {'))
   lines <- c(lines, "")
 
-  # Extract from JASP file in module's examples folder
+  # Extract from JASP file in module's jaspfiles folder
   lines <- c(lines, "  # Load from JASP example file")
-  lines <- c(lines, paste0('  jaspFile <- testthat::test_path("..", "..", "examples", "', jaspFileName, '")'))
+  lines <- c(lines, paste0('  jaspFile <- testthat::test_path("jaspfiles", "', sourceFolder, '", "', jaspFileName, '")'))
 
   # Generate appropriate options extraction based on number of analyses
   if (totalAnalyses == 1) {
@@ -644,7 +756,7 @@ makeExpectations <- function(tests, name, options, dataset) {
 makeSingleExpectation <- function(test, name, options, dataset, centralizePreamble) {
   if (!is.character(test$title) || test$title == "") {
     test$title <- paste("titleless", test$type, test$id, sep = "-")
-    warning(test$type, " does not have a title, using a generic one: ", test$title, immediate. = TRUE)
+    cli::cli_warn("{test$type} does not have a title, using a generic one: {.val {test$title}}")
   }
 
   openingLine <- addOpeningLine(test)

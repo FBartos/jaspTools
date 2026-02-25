@@ -15,6 +15,13 @@ testAnalysis(name, onlyPlots = FALSE)
 Tests a specific R analysis found under module/tests/testthat. Useful to perform before
 making a pull request, to prevent failing builds.
 }
+\details{
+In addition to the standard test file (e.g., \code{test-AnalysisName.R}), this function
+also discovers auto-generated source-based test files (\code{test-library-*.R},
+\code{test-verified-*.R}, \code{test-other-*.R}) that contain
+\code{runAnalysis("AnalysisName", ...)} calls. This ensures that tests
+created by \code{\link{makeTestsFromExamples}} are included when testing an analysis.
+}
 \examples{
 
 testAnalysis("AnovaBayesian")

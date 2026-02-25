@@ -2,14 +2,22 @@
 % Please edit documentation in R/test-generator.R
 \name{generateExampleTestFileContent}
 \alias{generateExampleTestFileContent}
-\title{Generate test file content for example-based tests}
+\title{Generate test file content for source-based tests}
 \usage{
-generateExampleTestFileContent(baseName, sanitizedName, testBlocks)
+generateExampleTestFileContent(
+  baseName,
+  sanitizedName,
+  sourceFolder,
+  testBlocks
+)
 }
 \arguments{
 \item{baseName}{Original JASP file name without extension.}
 
 \item{sanitizedName}{Sanitized name for use in code.}
+
+\item{sourceFolder}{String indicating the source folder: \code{"library"},
+\code{"verified"}, or \code{"other"}.}
 
 \item{testBlocks}{List of test block strings.}
 }
@@ -17,6 +25,6 @@ generateExampleTestFileContent(baseName, sanitizedName, testBlocks)
 Character string with complete test file content.
 }
 \description{
-Generate test file content for example-based tests
+Generate test file content for source-based tests
 }
 \keyword{internal}
