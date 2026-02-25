@@ -310,6 +310,7 @@ getTestFilesMatchingName <- function(name, modulePath) {
     content <- readLines(file.path(testsDir, ef), warn = FALSE)
     if (any(grepl(pattern, content)))
       matchedFiles <- c(matchedFiles, ef)
+  }
 
   if (length(matchedFiles) == 0)
     stop("Could not locate test file for ", name, ". Found the following test files: ", paste(basename(testFiles), collapse = ", "))
