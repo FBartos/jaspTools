@@ -304,12 +304,12 @@ getTestFilesMatchingName <- function(name, modulePath) {
   # Pass 2: scan test-{library,verified,other}-* files for runAnalysis("name", ...) calls
   sourceFiles <- testFiles[grepl("^test-(library|verified|other)-.*\\.[rR]$", testFiles)]
   sourceFiles <- setdiff(sourceFiles, matchedFiles)
-  pattern <- paste0('runAnalysis\\(\\s*["\']', name, '["\']')
+  escapedName <- gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", name)
+  pattern <- paste0('runAnalysis\\(\\s*["\']', escapedName, '["\']')
   for (ef in sourceFiles) {
     content <- readLines(file.path(testsDir, ef), warn = FALSE)
     if (any(grepl(pattern, content)))
       matchedFiles <- c(matchedFiles, ef)
-  }
 
   if (length(matchedFiles) == 0)
     stop("Could not locate test file for ", name, ". Found the following test files: ", paste(basename(testFiles), collapse = ", "))
