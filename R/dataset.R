@@ -716,21 +716,27 @@ extractPairsFromValueAndType <- function(values, types, allColumnNames) {
 #' @keywords internal
 encodeOptionsWithMap <- function(options, encodingMap, forceEncode = NULL) {
 
-  # Create simple lookup from original to encoded (used as fallback when no type info available)
-  lookup <- stats::setNames(encodingMap$encoded, encodingMap$original)
+  # Simple lookup from original name to encoded name, deduplicated so each
+  # variable maps to exactly one encoded column (the first occurrence).
+  # Used as fallback when no type info is available and by regexEncodeString.
+  firstOccurrence <- !duplicated(encodingMap$original)
+  lookup <- stats::setNames(encodingMap$encoded[firstOccurrence],
+                            encodingMap$original[firstOccurrence])
 
   # Check if any variable appears with multiple types (needs type-aware encoding)
   hasMultiTypeVars <- anyDuplicated(encodingMap$original) > 0
 
-  # Type-aware lookup: given variable name and type, find the correct encoding
+  # Type-aware lookup: given variable name and type, find the correct encoding.
+  # Always returns a single string.
   typeAwareLookup <- function(varName, varType) {
     idx <- which(encodingMap$original == varName & encodingMap$type == varType)
-    if (length(idx) == 1L) {
-      return(encodingMap$encoded[idx])
+    if (length(idx) >= 1L) {
+      return(encodingMap$encoded[idx[1L]])
     }
-    # Fallback to simple lookup if type doesn't match
-    if (varName %in% names(lookup)) {
-      return(unname(lookup[varName]))
+    # Fallback: use the deduplicated lookup (first occurrence)
+    pos <- match(varName, names(lookup))
+    if (!is.na(pos)) {
+      return(unname(lookup[pos]))
     }
     return(varName)
   }
@@ -744,7 +750,7 @@ encodeOptionsWithMap <- function(options, encodingMap, forceEncode = NULL) {
     result <- x
     for (i in seq_along(result)) {
       for (origName in names(lookup)) {
-        escapedName <- gsub("([.\\\\^$|?*+()\\[\\]\\{\\}-])", "\\\\\\\1", origName)
+        escapedName <- gsub("([.\\\\^$|?*+()\\[\\]\\{\\}-])", "\\\\\\1", origName)
         pattern <- paste0("(?<![A-Za-z0-9_])", escapedName, "(?![A-Za-z0-9_])")
         result[i] <- gsub(pattern, lookup[[origName]], result[i], perl = TRUE)
       }
@@ -780,6 +786,20 @@ encodeOptionsWithMap <- function(options, encodingMap, forceEncode = NULL) {
       # (which contains the original user-facing variable names) using our lookup.
       if ("model" %in% names(x) && "modelOriginal" %in% names(x)) {
         x[["model"]] <- regexEncodeString(x[["modelOriginal"]])
+      }
+
+      # Special case: x is a list with a "value" element and types is a flat
+      # character vector (produced by fixOptionsForVariableTypes when additional
+      # fields like model/modelOriginal are preserved alongside the types/value
+      # structure). The character types apply to x$value, not the list itself.
+      if ("value" %in% names(x) && is.character(types)) {
+        x[["value"]] <- encodeValue(x[["value"]], types)
+        # Encode remaining elements without type info
+        for (i in seq_along(x)) {
+          if (identical(names(x)[i], "value")) next
+          x[[i]] <- encodeValue(x[[i]])
+        }
+        return(x)
       }
 
       # Recursively process list elements, threading parallel types structure
