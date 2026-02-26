@@ -542,3 +542,64 @@ test_that("encodeOptionsAndDataset preserves modelOriginal unchanged", {
   expect_equal(result$options$syntax$modelOriginal, originalModelOriginal,
                info = "modelOriginal should be preserved unchanged")
 })
+
+test_that("encodeOptionsAndDataset uses correct type when same variable has multiple types", {
+
+  # A variable can appear in multiple options with different types, e.g.,
+  # "x1" used as scale input for analysis AND as nominal label for a forest plot.
+  # The encoder must produce separate encoded columns for each type.
+
+  opts <- list(
+    scaleVar    = "x1",                   `scaleVar.types`    = "scale",
+    nominalVars = c("x1", "x2"),          `nominalVars.types` = c("nominal", "nominal"),
+    `.meta` = list()
+  )
+  dataset <- data.frame(x1 = c(1, 2, 3), x2 = c(4, 5, 6))
+  result  <- jaspTools:::encodeOptionsAndDataset(opts, dataset)
+
+  # scaleVar and nominalVars[1] both refer to "x1" but must get different encoded names
+  expect_false(result$options$scaleVar == result$options$nominalVars[1])
+
+  # the scale column should be numeric, the nominal column should be a factor
+  expect_true(is.numeric(result$dataset[[result$options$scaleVar]]))
+  expect_true(is.factor( result$dataset[[result$options$nominalVars[1]]]))
+})
+
+test_that("encodeOptionsAndDataset handles multi-type variables from JASP file", {
+
+  # In the Acute Respiratory Infections file, the Bayesian Binomial Meta-Analysis
+  # uses x1, x2, n1, n2 as scale inputs (successes/sample sizes) and the same
+  # variables as nominal labels in the forest plot. The encoding must assign
+  # different encoded columns so the inputs stay numeric and the labels are factors.
+
+  jaspFile <- file.path(testthat::test_path(), "..", "JASPFiles",
+                        "Acute_Respiratory_Infections.jasp")
+  skip_if_not(file.exists(jaspFile), "Test JASP file not found")
+
+  opts    <- jaspTools::analysisOptions(jaspFile)[[2]]
+  dataset <- jaspTools::extractDatasetFromJASPFile(jaspFile)
+  result  <- jaspTools:::encodeOptionsAndDataset(opts, dataset)
+
+  # -- collect the two sets of encoded column names --
+  inputVars <- c(
+    successesGroup1  = result$options$successesGroup1,
+    successesGroup2  = result$options$successesGroup2,
+    sampleSizeGroup1 = result$options$sampleSizeGroup1,
+    sampleSizeGroup2 = result$options$sampleSizeGroup2
+  )
+  forestVars <- result$options$forestPlotStudyInformationSelectedVariables
+
+  # the input variables and forest plot variables must have different encoded names
+  # (because the same original column, e.g. x1, is encoded once as scale and once as nominal)
+  expect_length(intersect(inputVars, forestVars), 0)
+
+  # all input columns should be numeric
+  for (nm in names(inputVars)) {
+    expect_true(is.numeric(result$dataset[[inputVars[[nm]]]]), info = nm)
+  }
+
+  # all forest plot columns should be factors
+  for (v in forestVars) {
+    expect_true(is.factor(result$dataset[[v]]), info = v)
+  }
+})
