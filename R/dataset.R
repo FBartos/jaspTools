@@ -566,6 +566,17 @@ encodeOptionsAndDataset <- function(options, dataset, forceEncode = NULL) {
   dataset <- loadCorrectDataset(dataset)
   allColumnNames <- colnames(dataset)
 
+  # If variableNameSeparator is present, derive component variable names from
+
+  # composite columns (e.g., "y1_y1" split by "_" yields "y1") so they are
+  # recognised during variable extraction even when not standalone columns.
+  sep <- options[["variableNameSeparator"]]
+  if (!is.null(sep) && nzchar(sep)) {
+    splits <- strsplit(allColumnNames, sep, fixed = TRUE)
+    componentNames <- unique(unlist(splits[lengths(splits) == 2L]))
+    allColumnNames <- unique(c(allColumnNames, componentNames))
+  }
+
   # Step 1 & 2: Find all variable-type pairs from options
   varTypePairs <- extractVariableTypePairs(options, allColumnNames)
 
