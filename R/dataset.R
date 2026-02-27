@@ -566,6 +566,17 @@ encodeOptionsAndDataset <- function(options, dataset, forceEncode = NULL) {
   dataset <- loadCorrectDataset(dataset)
   allColumnNames <- colnames(dataset)
 
+  # If variableNameSeparator is present, derive component variable names from
+
+  # composite columns (e.g., "y1_y1" split by "_" yields "y1") so they are
+  # recognised during variable extraction even when not standalone columns.
+  sep <- options[["variableNameSeparator"]]
+  if (!is.null(sep) && nzchar(sep)) {
+    splits <- strsplit(allColumnNames, sep, fixed = TRUE)
+    componentNames <- unique(unlist(splits[lengths(splits) == 2L]))
+    allColumnNames <- unique(c(allColumnNames, componentNames))
+  }
+
   # Step 1 & 2: Find all variable-type pairs from options
   varTypePairs <- extractVariableTypePairs(options, allColumnNames)
 
@@ -586,7 +597,7 @@ encodeOptionsAndDataset <- function(options, dataset, forceEncode = NULL) {
   names(encodingMap)[1] <- "original"
 
   # Step 4: Encode the options
-  encodedOptions <- encodeOptionsWithMap(options, encodingMap, allColumnNames, forceEncode)
+  encodedOptions <- encodeOptionsWithMap(options, encodingMap, forceEncode)
 
   # Step 5: Create the encoded dataset
   encodedDataset <- createEncodedDataset(dataset, encodingMap)
@@ -710,29 +721,47 @@ extractPairsFromValueAndType <- function(values, types, allColumnNames) {
 #'
 #' @param options The options list.
 #' @param encodingMap Data.frame with columns \code{original}, \code{encoded}, \code{type}.
-#' @param allColumnNames Vector of valid column names.
 #' @param forceEncode Optional character vector of option names to force-encode via regex.
 #'
 #' @return The options list with encoded variable names.
 #' @keywords internal
-encodeOptionsWithMap <- function(options, encodingMap, allColumnNames, forceEncode = NULL) {
+encodeOptionsWithMap <- function(options, encodingMap, forceEncode = NULL) {
 
-  # Create lookup from original to encoded
-  lookup <- stats::setNames(encodingMap$encoded, encodingMap$original)
+  # Simple lookup from original name to encoded name, deduplicated so each
+  # variable maps to exactly one encoded column (the first occurrence).
+  # Used as fallback when no type info is available and by regexEncodeString.
+  firstOccurrence <- !duplicated(encodingMap$original)
+  lookup <- stats::setNames(encodingMap$encoded[firstOccurrence],
+                            encodingMap$original[firstOccurrence])
 
-  # Force-encode a string value using regex replacement
+  # Check if any variable appears with multiple types (needs type-aware encoding)
+  hasMultiTypeVars <- anyDuplicated(encodingMap$original) > 0
 
-  # Uses word boundaries to avoid partial matches
-  forceEncodeString <- function(x, lookup) {
+  # Type-aware lookup: given variable name and type, find the correct encoding.
+  # Always returns a single string.
+  typeAwareLookup <- function(varName, varType) {
+    idx <- which(encodingMap$original == varName & encodingMap$type == varType)
+    if (length(idx) >= 1L) {
+      return(encodingMap$encoded[idx[1L]])
+    }
+    # Fallback: use the deduplicated lookup (first occurrence)
+    pos <- match(varName, names(lookup))
+    if (!is.na(pos)) {
+      return(unname(lookup[pos]))
+    }
+    return(varName)
+  }
+
+  # Replace column names embedded in a string using word-boundary regex.
+  # Used for model formulas (e.g., "A~B") and forceEncode options.
+  regexEncodeString <- function(x) {
     if (!is.character(x) || length(x) == 0) {
       return(x)
     }
     result <- x
     for (i in seq_along(result)) {
       for (origName in names(lookup)) {
-        # Use word boundary regex to replace column names
-        # Escape regex metacharacters in the original name
-        escapedName <- gsub("([.\\\\^$|?*+()\\[\\]\\{\\}-])", "\\\\\\\1", origName)
+        escapedName <- gsub("([.\\\\^$|?*+()\\[\\]\\{\\}-])", "\\\\\\1", origName)
         pattern <- paste0("(?<![A-Za-z0-9_])", escapedName, "(?![A-Za-z0-9_])")
         result[i] <- gsub(pattern, lookup[[origName]], result[i], perl = TRUE)
       }
@@ -740,13 +769,24 @@ encodeOptionsWithMap <- function(options, encodingMap, allColumnNames, forceEnco
     return(result)
   }
 
-  # Recursively encode values
-  encodeValue <- function(x) {
+  # Recursively encode values, using parallel types structure for type-aware encoding
+  # when a variable appears with multiple types in the encoding map.
+  # @param x The value to encode.
+  # @param types The parallel types structure (from the .types option entry), or NULL.
+  encodeValue <- function(x, types = NULL) {
     if (is.character(x)) {
       # Replace any values that match column names in our encoding map
-      idx <- x %in% names(lookup)
-      if (any(idx)) {
-        x[idx] <- lookup[x[idx]]
+      idx <- which(x %in% encodingMap$original)
+      if (length(idx) > 0) {
+        if (hasMultiTypeVars && !is.null(types) && is.character(types) && length(types) == length(x)) {
+          # Type-aware encoding: use the parallel types to disambiguate
+          for (j in idx) {
+            x[j] <- typeAwareLookup(x[j], types[j])
+          }
+        } else {
+          # Simple encoding (no ambiguity or no type info)
+          x[idx] <- unname(lookup[x[idx]])
+        }
       }
       return(x)
     } else if (is.list(x)) {
@@ -756,40 +796,41 @@ encodeOptionsWithMap <- function(options, encodingMap, allColumnNames, forceEnco
       # encoding scheme doesn't match ours, we must re-encode from "modelOriginal"
       # (which contains the original user-facing variable names) using our lookup.
       if ("model" %in% names(x) && "modelOriginal" %in% names(x)) {
-        # Re-encode model from modelOriginal using regex-based replacement
-        x[["model"]] <- forceEncodeString(x[["modelOriginal"]], lookup)
+        x[["model"]] <- regexEncodeString(x[["modelOriginal"]])
       }
 
-      # Recursively process list elements
+      # Special case: x is a list with a "value" element and types is a flat
+      # character vector (produced by fixOptionsForVariableTypes when additional
+      # fields like model/modelOriginal are preserved alongside the types/value
+      # structure). The character types apply to x$value, not the list itself.
+      if ("value" %in% names(x) && is.character(types)) {
+        x[["value"]] <- encodeValue(x[["value"]], types)
+        # Encode remaining elements without type info
+        for (i in seq_along(x)) {
+          if (identical(names(x)[i], "value")) next
+          x[[i]] <- encodeValue(x[[i]])
+        }
+        return(x)
+      }
+
+      # Recursively process list elements, threading parallel types structure
       for (i in seq_along(x)) {
-        x[[i]] <- encodeValue(x[[i]])
+        subTypes <- NULL
+        if (!is.null(types) && is.list(types)) {
+          # Match by name first, then by position
+          nm <- names(x)[i]
+          if (!is.null(nm) && !is.null(names(types)) && nm %in% names(types)) {
+            subTypes <- types[[nm]]
+          } else if (i <= length(types)) {
+            subTypes <- types[[i]]
+          }
+        }
+        x[[i]] <- encodeValue(x[[i]], subTypes)
       }
       return(x)
     } else {
       return(x)
     }
-  }
-
-  # Force-encode a string value using regex replacement
-  # Uses word boundaries to avoid partial matches
-  forceEncodeValue <- function(x, lookup) {
-    if (!is.character(x) || length(x) == 0) {
-      return(x)
-    }
-    result <- x
-    for (i in seq_along(result)) {
-      for (origName in names(lookup)) {
-        # Use word boundary regex to replace column names
-        # (?<![A-Za-z0-9_]) is a negative lookbehind for word characters
-        # (?![A-Za-z0-9_]) is a negative lookahead for word characters
-        # This prevents matching partial words
-        # Escape regex metacharacters in the original name
-        escapedName <- gsub("([.\\^$|?*+()\\[\\]\\{\\}-])", "\\\\\\1", origName)
-        pattern <- paste0("(?<![A-Za-z0-9_])", escapedName, "(?![A-Za-z0-9_])")
-        result[i] <- gsub(pattern, lookup[[origName]], result[i], perl = TRUE)
-      }
-    }
-    return(result)
   }
 
   # Process all options except .meta and .types entries
@@ -799,12 +840,12 @@ encodeOptionsWithMap <- function(options, encodingMap, allColumnNames, forceEnco
       next
     }
 
-    # Check if this option should be force-encoded
     if (!is.null(forceEncode) && nm %in% forceEncode) {
-      # Force encode using regex - only works on character values
-      options[[nm]] <- forceEncodeValue(options[[nm]], lookup)
+      options[[nm]] <- regexEncodeString(options[[nm]])
     } else {
-      options[[nm]] <- encodeValue(options[[nm]])
+      # Use the parallel .types entry for type-aware encoding
+      typesKey <- paste0(nm, ".types")
+      options[[nm]] <- encodeValue(options[[nm]], options[[typesKey]])
     }
   }
 
