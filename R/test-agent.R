@@ -395,7 +395,7 @@ writeAgentTestLog <- function(allResults, logFile) {
       }
 
       # Add skip reason if skipped
-      if (isTRUE(row$skipped)) {
+      if (isTRUE(as.logical(row$skipped))) {
         testEntry$skipReason <- extractSkipReason(row$result[[1]])
       }
 
