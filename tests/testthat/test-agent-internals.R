@@ -4,8 +4,8 @@ context("agent test internals")
 
 mockExpectation <- function(class, msg) {
   structure(
-    class = c(class, "expectation", "condition"),
-    list(message = msg)
+    list(message = msg),
+    class = c(class, "expectation", "condition")
   )
 }
 

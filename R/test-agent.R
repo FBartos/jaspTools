@@ -213,7 +213,7 @@ buildAgentTestResult <- function(allResults, logFile) {
 
     if (isTRUE(res$error)) {
       errorModules[moduleName] <- trimws(res$errorMessage)
-      totalFail <- totalFail + 1L
+      totalError <- totalError + 1L
       next
     }
 
@@ -407,11 +407,12 @@ writeAgentTestLog <- function(allResults, logFile) {
     # Compute module summary
     logData[[moduleName]] <- list(
       summary = list(
-        fail = sum(df$failed),
-        warn = sum(df$warning),
-        skip = sum(df$skipped),
-        pass = sum(df$passed),
-        time = sum(df$real)
+        fail  = sum(df$failed),
+        error = sum(as.logical(df$error)),
+        warn  = sum(df$warning),
+        skip  = sum(df$skipped),
+        pass  = sum(df$passed),
+        time  = sum(df$real)
       ),
       tests = tests
     )

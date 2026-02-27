@@ -13,11 +13,11 @@ The path is printed in the summary so it can be read later.}
 \value{
 Invisibly returns a \code{jaspAgentTestResults} object (S3 class) with:
 \describe{
-\item{status}{0 = all passed, 1 = failures or errors.}
-\item{summary}{Named list of counts: \code{fail}, \code{warn}, \code{skip}, \code{pass}, \code{time}.}
+\item{status}{0 = all passed, 1 = failures, errors, or module-level errors.}
+\item{summary}{Named list of counts: \code{fail}, \code{error}, \code{warn}, \code{skip}, \code{pass}, \code{time}.}
 \item{logFile}{Path to the detailed JSON log file.}
 \item{failures}{Data frame with columns \code{module}, \code{file}, \code{test}, \code{message}
-— one row per failed expectation.}
+— one row per failed expectation or test error.}
 \item{warnings}{Data frame with columns \code{module}, \code{file}, \code{test}, \code{message}.}
 \item{skips}{Data frame with columns \code{module}, \code{file}, \code{test}, \code{reason}.}
 \item{tests}{Data frame of all individual tests with columns \code{module}, \code{file},
