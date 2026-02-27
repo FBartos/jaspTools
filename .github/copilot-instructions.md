@@ -137,6 +137,11 @@ Generated test files:
 ### Testing Workflow
 
 ```r
+# Agent-optimized (preferred -- compact output, returns queryable result object)
+x <- agentTestAll()                # All modules in module.dirs
+x <- agentTestAnalysis("BinomialTest")  # Specific analysis
+
+# Human-oriented (verbose output)
 testAnalysis("BinomialTest")  # Single analysis
 testAll()                      # All modules in module.dirs
 testAll(onlyPlots = TRUE)      # Only plot tests (faster for vdiffr)
@@ -191,7 +196,7 @@ Analysis functions may have `Internal` suffixes. `findCorrectFunction()` searche
 - **jaspGraphs**: Plotting system for JASP-compatible graphics
 - **jaspResults**: Legacy state container (now merged into jaspBase)
 - **vdiffr**: Visual regression testing for plots
-- **testthat**: Unit testing framework (requires ≥3.0.3)
+- **testthat**: Unit testing framework (requires ≥3.2.2)
 
 Check versions with `.checkUpdatesJaspCorePkgs()` on package load.
 
@@ -199,6 +204,7 @@ Check versions with `.checkUpdatesJaspCorePkgs()` on package load.
 
 - `R/run.R`: Analysis execution, RCPP mask setup, JSON conversion. Supports `encodedDataset` parameter for pre-encoded data.
 - `R/test.R`: Testing infrastructure, `testAnalysis()`, `testAll()`
+- `R/test-agent.R`: Agent-friendly test wrappers, `agentTestAll()`, `agentTestAnalysis()`
 - `R/options.R`: Option parsing from QML/JASP/JSON. Cross-platform path handling for `.jasp` files.
 - `R/dataset.R`: Dataset loading, type conversion, `extractDatasetFromJASPFile()`, `encodeOptionsAndDataset()`
 - `R/rbridge.R`: RCPP bridge replacements (`.readDatasetToEndNative`, `.requestTempFileNameNative`, etc.)

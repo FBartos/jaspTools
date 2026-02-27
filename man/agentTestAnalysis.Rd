@@ -19,3 +19,12 @@ for the full description of fields.
 Tests a specific R analysis but returns compact output suitable for LLM/MCP
 consumption. Detailed results are written to a JSON log file.
 }
+\examples{
+\dontrun{
+results <- agentTestAnalysis("Correlation")
+results$status
+results$failures
+results$warnings
+}
+
+}

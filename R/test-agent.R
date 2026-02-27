@@ -27,6 +27,15 @@
 #'   }
 #'   Printing the object shows a compact one-line summary plus failure details.
 #'
+#' @examples
+#' \dontrun{
+#' results <- agentTestAll()
+#' results$status
+#' results$summary
+#' results$failures
+#' results$tests
+#' }
+#'
 #' @export agentTestAll
 agentTestAll <- function(logFile = NULL) {
   if (is.null(logFile))
@@ -85,6 +94,14 @@ agentTestAll <- function(logFile = NULL) {
 #'
 #' @return Invisibly returns a \code{jaspAgentTestResults} object. See \code{\link{agentTestAll}}
 #'   for the full description of fields.
+#'
+#' @examples
+#' \dontrun{
+#' results <- agentTestAnalysis("Correlation")
+#' results$status
+#' results$failures
+#' results$warnings
+#' }
 #'
 #' @export agentTestAnalysis
 agentTestAnalysis <- function(name, logFile = NULL) {

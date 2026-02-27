@@ -37,3 +37,13 @@ Uses testthat's \code{LlmReporter} internally — a reporter designed for non-in
 environments that disables spinner animations and dynamic output while retaining full
 snapshot/vdiffr support.
 }
+\examples{
+\dontrun{
+results <- agentTestAll()
+results$status
+results$summary
+results$failures
+results$tests
+}
+
+}
