@@ -91,6 +91,9 @@ agentTestAll <- function(logFile = NULL) {
 #'
 #' @param name String name of the analysis to test (case sensitive).
 #' @param logFile Path for the detailed JSON log. Defaults to a temp file.
+#' @param includeAll Logical (default \code{TRUE}). When \code{TRUE}, also
+#'   includes auto-generated example test files that reference this analysis.
+#'   Set \code{includeAll = FALSE} to restrict to the standard test file only.
 #'
 #' @return Invisibly returns a \code{jaspAgentTestResults} object. See \code{\link{agentTestAll}}
 #'   for the full description of fields.
@@ -104,12 +107,12 @@ agentTestAll <- function(logFile = NULL) {
 #' }
 #'
 #' @export agentTestAnalysis
-agentTestAnalysis <- function(name, logFile = NULL) {
+agentTestAnalysis <- function(name, logFile = NULL, includeAll = TRUE) {
   if (is.null(logFile))
     logFile <- tempfile(pattern = paste0("jasp-test-", name, "-"), fileext = ".json")
 
   modulePath <- getModulePathFromRFunction(name)
-  filesToTest <- getTestFilesMatchingName(name, modulePath)
+  filesToTest <- getTestFilesMatchingName(name, modulePath, includeAll = includeAll)
 
   envirValue <- Sys.getenv("NOT_CRAN")
   Sys.setenv("NOT_CRAN" = "true")

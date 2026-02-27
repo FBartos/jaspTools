@@ -4,12 +4,16 @@
 \alias{agentTestAnalysis}
 \title{Run a specific analysis test with agent-friendly output.}
 \usage{
-agentTestAnalysis(name, logFile = NULL)
+agentTestAnalysis(name, logFile = NULL, includeAll = TRUE)
 }
 \arguments{
 \item{name}{String name of the analysis to test (case sensitive).}
 
 \item{logFile}{Path for the detailed JSON log. Defaults to a temp file.}
+
+\item{includeAll}{Logical (default \code{TRUE}). When \code{TRUE}, also
+includes auto-generated example test files that reference this analysis.
+Set \code{includeAll = FALSE} to restrict to the standard test file only.}
 }
 \value{
 Invisibly returns a \code{jaspAgentTestResults} object. See \code{\link{agentTestAll}}

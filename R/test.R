@@ -41,14 +41,19 @@ runTestsTravis <- function(modulePath) {
 #'
 #' @param name String name of the analysis to test (case sensitive).
 #' @param onlyPlots Would you like to only run the tests for plots? This can speed up the generating of reference images in case you are not interested in the other unit tests.
+#' @param includeAll Logical (default \code{TRUE}). When \code{TRUE}, also
+#'   includes auto-generated example test files (\code{test-library-*.R},
+#'   \code{test-verified-*.R}, \code{test-other-*.R}) that contain
+#'   \code{runAnalysis("AnalysisName", ...)} calls. Set \code{includeAll = FALSE} to
+#'   restrict testing to the standard \code{test-AnalysisName.R} file only.
 #' @examples
 #'
 #' testAnalysis("AnovaBayesian")
 #'
 #' @export testAnalysis
-testAnalysis <- function(name, onlyPlots = FALSE) {
+testAnalysis <- function(name, onlyPlots = FALSE, includeAll = TRUE) {
   modulePath <- getModulePathFromRFunction(name)
-  filesToTest <- getTestFilesMatchingName(name, modulePath)
+  filesToTest <- getTestFilesMatchingName(name, modulePath, includeAll = includeAll)
 
   envirValue <- Sys.getenv("NOT_CRAN")
   Sys.setenv("NOT_CRAN" = "true") # this is to prevent vdiffr from skipping plots
@@ -286,7 +291,7 @@ approxMatch <- function(new, old, tol = 1e-5) {
 
 }
 
-getTestFilesMatchingName <- function(name, modulePath) {
+getTestFilesMatchingName <- function(name, modulePath, includeAll = TRUE) {
   testsDir <- file.path(modulePath, "tests", "testthat")
   if (!dir.exists(testsDir))
     stop("Could not locate ", testsDir)
@@ -302,18 +307,22 @@ getTestFilesMatchingName <- function(name, modulePath) {
   matchedFiles <- testFiles[matches]
 
   # Pass 2: scan test-{library,verified,other}-* files for runAnalysis("name", ...) calls
-  sourceFiles <- testFiles[grepl("^test-(library|verified|other)-.*\\.[rR]$", testFiles)]
-  sourceFiles <- setdiff(sourceFiles, matchedFiles)
-  escapedName <- gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", name)
-  pattern <- paste0('runAnalysis\\(\\s*["\']', escapedName, '["\']')
-  for (ef in sourceFiles) {
-    content <- readLines(file.path(testsDir, ef), warn = FALSE)
-    if (any(grepl(pattern, content)))
-      matchedFiles <- c(matchedFiles, ef)
+  if (includeAll) {
+    sourceFiles <- testFiles[grepl("^test-(library|verified|other)-.*\\.[rR]$", testFiles)]
+    sourceFiles <- setdiff(sourceFiles, matchedFiles)
+    escapedName <- gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", name)
+    pattern <- paste0('runAnalysis\\(\\s*["\']', escapedName, '["\']')
+    for (ef in sourceFiles) {
+      content <- readLines(file.path(testsDir, ef), warn = FALSE)
+      if (any(grepl(pattern, content)))
+        matchedFiles <- c(matchedFiles, ef)
+    }
   }
 
-  if (length(matchedFiles) == 0)
-    stop("Could not locate test file for ", name, ". Found the following test files: ", paste(basename(testFiles), collapse = ", "))
+  if (length(matchedFiles) == 0) {
+    hint <- if (!includeAll) " (example test files were excluded because includeAll = FALSE)" else ""
+    stop("Could not locate test file for ", name, hint, ". Found the following test files: ", paste(basename(testFiles), collapse = ", "))
+  }
 
   return(matchedFiles)
 }
