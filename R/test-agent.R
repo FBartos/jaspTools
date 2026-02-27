@@ -13,11 +13,11 @@
 #'
 #' @return Invisibly returns a \code{jaspAgentTestResults} object (S3 class) with:
 #'   \describe{
-#'     \item{status}{0 = all passed, 1 = failures or errors.}
-#'     \item{summary}{Named list of counts: \code{fail}, \code{warn}, \code{skip}, \code{pass}, \code{time}.}
+#'     \item{status}{0 = all passed, 1 = failures, errors, or module-level errors.}
+#'     \item{summary}{Named list of counts: \code{fail}, \code{error}, \code{warn}, \code{skip}, \code{pass}, \code{time}.}
 #'     \item{logFile}{Path to the detailed JSON log file.}
 #'     \item{failures}{Data frame with columns \code{module}, \code{file}, \code{test}, \code{message}
-#'       — one row per failed expectation.}
+#'       — one row per failed expectation or test error.}
 #'     \item{warnings}{Data frame with columns \code{module}, \code{file}, \code{test}, \code{message}.}
 #'     \item{skips}{Data frame with columns \code{module}, \code{file}, \code{test}, \code{reason}.}
 #'     \item{tests}{Data frame of all individual tests with columns \code{module}, \code{file},
@@ -188,11 +188,12 @@ runTestsQuietly <- function(testFun) {
 #' Build a rich S3 result object from raw test results.
 #' @keywords internal
 buildAgentTestResult <- function(allResults, logFile) {
-  totalFail <- 0L
-  totalWarn <- 0L
-  totalSkip <- 0L
-  totalPass <- 0L
-  totalTime <- 0
+  totalFail  <- 0L
+  totalWarn  <- 0L
+  totalSkip  <- 0L
+  totalPass  <- 0L
+  totalError <- 0L
+  totalTime  <- 0
   errorModules <- character()
 
   # Collectors for failures/warnings/skips data frames
@@ -217,11 +218,12 @@ buildAgentTestResult <- function(allResults, logFile) {
     }
 
     df <- as.data.frame(res)
-    totalFail <- totalFail + sum(df$failed)
-    totalWarn <- totalWarn + sum(df$warning)
-    totalSkip <- totalSkip + sum(df$skipped)
-    totalPass <- totalPass + sum(df$passed)
-    totalTime <- totalTime + sum(df$real)
+    totalFail  <- totalFail  + sum(df$failed)
+    totalWarn  <- totalWarn  + sum(df$warning)
+    totalSkip  <- totalSkip  + sum(df$skipped)
+    totalPass  <- totalPass  + sum(df$passed)
+    totalError <- totalError + sum(as.logical(df$error))
+    totalTime  <- totalTime  + sum(df$real)
 
     # Clean test df: drop list-column and timing details, add module, rename
     dfClean <- df[, setdiff(names(df), c("result", "user", "system")), drop = FALSE]
@@ -229,8 +231,8 @@ buildAgentTestResult <- function(allResults, logFile) {
     dfClean <- cbind(module = moduleName, dfClean, stringsAsFactors = FALSE)
     testDfList[[moduleName]] <- dfClean
 
-    # Extract failures (one row per failed expectation)
-    for (i in which(df$failed > 0)) {
+    # Extract failures and errors (one row per failed/errored expectation)
+    for (i in which(df$failed > 0 | as.logical(df$error))) {
       row <- df[i, ]
       details <- extractDetailedFailures(row$result[[1]])
       for (d in details) {
@@ -292,12 +294,12 @@ buildAgentTestResult <- function(allResults, logFile) {
                time = numeric(0), stringsAsFactors = FALSE)
   }
 
-  status <- if (totalFail > 0 || length(errorModules) > 0) 1L else 0L
+  status <- if (totalFail > 0 || totalError > 0 || length(errorModules) > 0) 1L else 0L
 
   structure(
     list(
       status       = status,
-      summary      = list(fail = totalFail, warn = totalWarn,
+      summary      = list(fail = totalFail, error = totalError, warn = totalWarn,
                           skip = totalSkip, pass = totalPass, time = totalTime),
       logFile      = logFile,
       failures     = failures,
@@ -321,8 +323,8 @@ buildAgentTestResult <- function(allResults, logFile) {
 #' @export
 print.jaspAgentTestResults <- function(x, ...) {
   s <- x$summary
-  cat(sprintf("== Test Results == FAIL: %d | WARN: %d | SKIP: %d | PASS: %d | Time: %.1fs\n",
-              s$fail, s$warn, s$skip, s$pass, s$time))
+  cat(sprintf("== Test Results == FAIL: %d | ERROR: %d | WARN: %d | SKIP: %d | PASS: %d | Time: %.1fs\n",
+              s$fail, s$error, s$warn, s$skip, s$pass, s$time))
 
   if (length(x$errorModules) > 0) {
     cat("\nMODULE ERRORS:\n")
@@ -337,11 +339,11 @@ print.jaspAgentTestResults <- function(x, ...) {
     seen <- character()
     for (i in seq_len(nrow(x$failures))) {
       row <- x$failures[i, ]
-      key <- paste(row$file, row$test, sep = "::")
+      key <- paste(row$module, row$file, row$test, sep = "::")
       if (key %in% seen) next
       seen <- c(seen, key)
       msg1 <- strsplit(row$message, "\n", fixed = TRUE)[[1]][1]
-      cat(sprintf("  %s :: %s\n    %s\n", row$file, row$test, msg1))
+      cat(sprintf("  [%s] %s :: %s\n    %s\n", row$module, row$file, row$test, msg1))
     }
   }
 
@@ -384,8 +386,8 @@ writeAgentTestLog <- function(allResults, logFile) {
         time    = row$real
       )
 
-      # Add failure details if any
-      if (row$failed > 0) {
+      # Add failure/error details if any
+      if (row$failed > 0 || isTRUE(as.logical(row$error))) {
         testEntry$failureDetails <- extractDetailedFailures(row$result[[1]])
       }
 
