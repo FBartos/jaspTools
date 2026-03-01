@@ -4,12 +4,18 @@
 \alias{testAnalysis}
 \title{Test a specific JASP analysis.}
 \usage{
-testAnalysis(name, onlyPlots = FALSE)
+testAnalysis(name, onlyPlots = FALSE, includeAll = TRUE)
 }
 \arguments{
 \item{name}{String name of the analysis to test (case sensitive).}
 
 \item{onlyPlots}{Would you like to only run the tests for plots? This can speed up the generating of reference images in case you are not interested in the other unit tests.}
+
+\item{includeAll}{Logical (default \code{TRUE}). When \code{TRUE}, also
+includes auto-generated example test files (\code{test-library-*.R},
+\code{test-verified-*.R}, \code{test-other-*.R}) that contain
+\code{runAnalysis("AnalysisName", ...)} calls. Set \code{includeAll = FALSE}
+to restrict testing to the standard \code{test-AnalysisName.R} file only.}
 }
 \description{
 Tests a specific R analysis found under module/tests/testthat. Useful to perform before
@@ -21,6 +27,9 @@ also discovers auto-generated source-based test files (\code{test-library-*.R},
 \code{test-verified-*.R}, \code{test-other-*.R}) that contain
 \code{runAnalysis("AnalysisName", ...)} calls. This ensures that tests
 created by \code{\link{makeTestsFromExamples}} are included when testing an analysis.
+
+To exclude example-based test files and run only the standard test file, set
+\code{includeAll = FALSE}.
 }
 \examples{
 
