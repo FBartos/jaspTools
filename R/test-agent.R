@@ -163,6 +163,17 @@ agentTestAnalysis <- function(name, logFile = NULL, includeAll = TRUE) {
 #'   and \code{error} (error message string, or NULL on success).
 #' @keywords internal
 runTestsQuietly <- function(testFun) {
+  # Fix cli.spinner: btw::local_reproducible_output() (called by btw_tool_run_r)
+
+  # sets options(cli.spinner = FALSE). This is invalid — cli::get_spinner()
+  # expects NULL, a string, or a list. When testthat::LlmReporter$new() calls
+  # ProgressReporter$initialize() -> cli::get_spinner()$frames, it crashes with
+  # "$ operator is invalid for atomic vectors". Guard against non-string values.
+  oldSpinner <- getOption("cli.spinner")
+  if (!is.null(oldSpinner) && !is.character(oldSpinner) && !is.list(oldSpinner))
+    options(cli.spinner = "line")
+  on.exit(options(cli.spinner = oldSpinner), add = TRUE)
+
   # We CANNOT muffle all warnings because testthat's expectation_warning
   # inherits from warning — muffling them breaks the test framework's
   # condition recording and causes hangs. Only muffle the specific
