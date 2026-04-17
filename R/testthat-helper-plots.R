@@ -523,6 +523,10 @@ normalize_data_frame_for_snapshot <- function(df) {
 
   for (nm in names(df)) {
     col <- df[[nm]]
+    if (is.list(col)) {
+      df[[nm]] <- NULL  # drop list columns (e.g., ggraph embeds igraph objects)
+      next
+    }
     if (is.factor(col))
       df[[nm]] <- as.character(col)
     if (inherits(col, "POSIXct") || inherits(col, "POSIXt"))
@@ -536,18 +540,33 @@ normalize_data_frame_for_snapshot <- function(df) {
   df
 }
 
-normalize_named_list <- function(x) {
+normalize_named_list <- function(x, .depth = 0L) {
   if (is.null(x) || inherits(x, "waiver") || is.function(x))
     return(NULL)
 
+  if (.depth > 10L)
+    return("<truncated: max depth exceeded>")
+
+  if (is.environment(x) || typeof(x) == "externalptr" || inherits(x, "igraph"))
+    return(paste0("<", typeof(x), ">"))
+
+  if (inherits(x, "R6") || inherits(x, "refObjectGenerator") || isS4(x))
+    return(paste0("<", paste(class(x), collapse = "/"), ">"))
+
+  if (inherits(x, "vctrs_rcrd"))
+    return(paste0("<", paste(class(x), collapse = "/"), ">"))
+
+  if (is.call(x) || is.expression(x) || is.symbol(x))
+    return(deparse(x))
+
   if (is.list(x) && !is.null(names(x))) {
     x <- x[sort(names(x))]
-    x <- lapply(x, normalize_named_list)
+    x <- lapply(x, normalize_named_list, .depth = .depth + 1L)
     return(x)
   }
 
   if (is.list(x))
-    return(lapply(x, normalize_named_list))
+    return(lapply(x, normalize_named_list, .depth = .depth + 1L))
 
   if (is.factor(x))
     return(as.character(x))
