@@ -133,6 +133,9 @@ getSetupCompleteFileName <- function() {
 }
 
 .isSetupComplete <- function() {
+  if (isTRUE(.pkgenv[["internal"]][["setupCompleteOverride"]]))
+    return(TRUE)
+
   return(file.exists(getSetupCompleteFileName()))
 }
 

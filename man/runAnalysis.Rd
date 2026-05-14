@@ -9,9 +9,9 @@ runAnalysis(
   dataset = NULL,
   options,
   view = TRUE,
-  quiet = FALSE,
+  quiet = TRUE,
   makeTests = FALSE,
-  encodedDataset = FALSE
+  modulePath = NULL
 )
 }
 \arguments{
@@ -28,11 +28,15 @@ By default the directory in Resources is checked first, unless called within a t
 \item{view}{Boolean indicating whether to view the results in a webbrowser.}
 
 \item{quiet}{Boolean indicating whether to suppress messages from the
-analysis.}
+analysis and native QML bridge. Quiet runs are evaluated in a subprocess so
+native Desktop logging does not clutter the calling R session.}
 
 \item{makeTests}{Boolean indicating whether to create testthat unit tests and print them to the terminal.}
 
-\item{encodedDataset}{Boolean indicating whether to assume that the dataset is already encoded.}
+\item{modulePath}{Optional path to the module checkout that should be used
+for QML resolution and wrapped execution. When omitted, jaspTools first
+uses a module path attached to \code{options} by \code{analysisOptions()}
+and then falls back to configured \code{module.dirs}.}
 }
 \description{
 \code{runAnalysis} makes it possible to execute a JASP analysis in R. Usually this
@@ -43,6 +47,12 @@ replaced in the jaspTools so you do not have to deal with them. Note that
 analysis code between calls is incorporated. The output of the analysis is
 shown automatically through a call to \code{view} and returned
 invisibly.
+}
+\details{
+Saved/QML-bound options are replayed through the native QML runtime path. Use
+\code{analysisOptions()} for options that should be passed to
+\code{runAnalysis()}; options returned by \code{analysisRuntimeOptions()} are
+backend-prepared diagnostics and are not accepted by this runner.
 }
 \examples{
 

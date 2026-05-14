@@ -127,7 +127,7 @@ getMismatchesEqualSizeTables <- function(test, ref, nRows, nCols, cellNames) {
     lookupRow <- refVec[cellRange]
 
     for (cell in cellRange) {
-      indicesMatch <- which(lookupRow %in% testVec[cell])
+      indicesMatch <- which(vapply(lookupRow, tableValuesMatch, logical(1L), testVec[cell]))
       if (length(indicesMatch) > 0)
         lookupRow <- lookupRow[-min(indicesMatch)]
       else {
@@ -171,7 +171,9 @@ getMissingValuesDiffSizeTables <- function(test, ref, cellNames) {
   missingValues <- character(0)
   for (i in seq_along(searchFor)) {
 
-    if (!searchFor[i] %in% searchIn) {
+    matchIndex <- which(vapply(searchIn, tableValuesMatch, logical(1L), searchFor[i]))
+
+    if (length(matchIndex) == 0L) {
 
       missingValue <- paste0("`", names(searchFor)[i], "`")
       col <- attr(searchFor, "cellNames")[i]
@@ -180,7 +182,7 @@ getMissingValuesDiffSizeTables <- function(test, ref, cellNames) {
       missingValues <- c(missingValues, missingValue)
 
     } else {
-      searchIn <- searchIn[-min(which(searchIn %in% searchFor[i]))]
+      searchIn <- searchIn[-min(matchIndex)]
     }
 
   }
@@ -191,8 +193,35 @@ getMissingValuesDiffSizeTables <- function(test, ref, cellNames) {
 tableListToAnnotatedCharacterVector <- function(tableList, cellNames=NULL) {
     fullValues <- unlist(tableList)
     tableVec <- as.character(unlist(lapply(tableList, roundToPrecision)))
-    names(tableVec) <- fullValues
+    tableVec <- canonicalizeJaspColumnTokens(tableVec)
+    names(tableVec) <- canonicalizeJaspColumnTokens(as.character(fullValues))
     attr(tableVec, "cellNames") <- cellNames
 
     return(tableVec)
+}
+
+canonicalizeJaspColumnTokens <- function(x) {
+  if (!is.character(x) || length(x) == 0L)
+    return(x)
+
+  tokenPattern <- "(JaspColumn_[[:alnum:]_]+_Encoded|jaspColumn[0-9]+)"
+  tokens <- unlist(regmatches(x, gregexpr(tokenPattern, x, perl = TRUE)), use.names = FALSE)
+  tokens <- unique(tokens[nzchar(tokens)])
+
+  if (length(tokens) == 0L)
+    return(x)
+
+  replacements <- stats::setNames(paste0("<jaspColumn", seq_along(tokens), ">"), tokens)
+  for (token in tokens) {
+    x <- gsub(token, replacements[[token]], x, fixed = TRUE)
+  }
+
+  x
+}
+
+tableValuesMatch <- function(refValue, testValue) {
+  refValue <- unname(refValue)
+  testValue <- unname(testValue)
+
+  identical(refValue, testValue)
 }

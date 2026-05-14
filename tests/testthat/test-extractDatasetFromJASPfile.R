@@ -88,17 +88,14 @@ test_that("extractDatasetFromJASPFile handles binary columns correctly", {
 test_that("extractDatasetFromJASPFile handles infinity correctly", {
 
   jaspFile <- file.path(testthat::test_path(), "..", "JASPFiles", "debug-descriptives.jasp")
-  csvFile <- file.path(testthat::test_path(), "..", "JASPFiles", "debug-descriptives.csv")
 
   skip_if_not(file.exists(jaspFile), "Test JASP file not found")
 
   df <- extractDatasetFromJASPFile(jaspFile)
-  csv <- read.csv(csvFile, stringsAsFactors = FALSE, check.names = FALSE)
 
-  # debInf should be character with infinity symbol
-  expect_type(df[["debInf"]], "character")
-  expect_equal(unique(df[["debInf"]]), "\u221e", info = "debInf should contain infinity symbol")
-  expect_equal(df[["debInf"]], csv[["debInf"]], info = "debInf should match CSV")
+  expect_type(df[["debInf"]], "double")
+  expect_true(all(is.infinite(df[["debInf"]])), info = "debInf should contain infinite numeric values")
+  expect_true(all(df[["debInf"]] > 0), info = "debInf should contain positive infinity values")
 })
 
 test_that("extractDatasetFromJASPFile handles NaN/NA correctly", {

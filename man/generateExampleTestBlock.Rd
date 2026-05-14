@@ -28,7 +28,8 @@ generateExampleTestBlock(
 
 \item{results}{The analysis results.}
 
-\item{forceEncode}{Optional character vector of option names to force-encode via regex.}
+\item{forceEncode}{Compatibility argument retained for older callers. Supplying
+a non-\code{NULL} value now aborts.}
 }
 \value{
 Character string with the test_that block.
