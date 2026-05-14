@@ -40,14 +40,6 @@ extractDatasetFromJASPFile <- function(jaspFile, dataSetIndex = 1L) {
 
   jaspSyntax::readDatasetFromJaspFile(jaspFile, dataSetIndex = dataSetIndex)
 }
-.jaspSyntaxHelper <- function(names, required = TRUE, feature = "jaspSyntax bridge API") {
-  helperName <- .jaspSyntaxHelperName(names, required = required, feature = feature)
-  if (is.null(helperName))
-    return(NULL)
-
-  get(helperName, envir = asNamespace("jaspSyntax"), inherits = FALSE)
-}
-
 .jaspSyntaxHelperName <- function(names, required = TRUE, feature = "jaspSyntax bridge API") {
   namespace <- asNamespace("jaspSyntax")
   for (name in names) {
@@ -128,15 +120,6 @@ extractDatasetFromJASPFile <- function(jaspFile, dataSetIndex = 1L) {
     c("clearNativeState", "clearAllNativeState"),
     required = required,
     feature = "native lifecycle API"
-  )
-  invisible(NULL)
-}
-
-.jaspSyntaxClearQmlForms <- function(required = FALSE) {
-  .jaspSyntaxCall(
-    c("clearQmlForms", "clearQmlFormCache"),
-    required = required,
-    feature = "native QML lifecycle API"
   )
   invisible(NULL)
 }
@@ -257,41 +240,6 @@ preloadDataset <- function(datasetPathOrObject, options, modulePath = NULL,
     feature = "native requested dataset API"
   )
   .validateJaspSyntaxDataset(dataset, "jaspSyntax::readRequestedDataset()", required)
-}
-
-.jaspSyntaxReadDatasetHeader <- function(required = FALSE) {
-  dataset <- .jaspSyntaxCall(
-    "readDatasetHeader",
-    required = required,
-    feature = "native dataset header API"
-  )
-  .validateJaspSyntaxDataset(dataset, "jaspSyntax::readDatasetHeader()", required)
-}
-
-.jaspSyntaxDecodeColumnNames <- function(x, strict = FALSE, required = strict) {
-  if (!is.character(x) || length(x) == 0L)
-    return(x)
-
-  decoded <- tryCatch(
-    .jaspSyntaxCall(
-      "decodeColumnNames",
-      args = list(columnNames = x, strict = strict),
-      required = required,
-      feature = "native column decoding API",
-      requiredArgs = c("columnNames", if (isTRUE(strict)) "strict" else character(0L))
-    ),
-    error = function(e) {
-      if (isTRUE(required))
-        stop(e)
-
-      x
-    }
-  )
-
-  if (is.null(decoded))
-    return(x)
-
-  as.character(decoded)
 }
 
 .jaspSyntaxDatasetStateValue <- function(datasetState, name) {

@@ -157,4 +157,4 @@ To create unit tests you can read [this guide](https://github.com/jasp-stats/jas
 
 ## Known limitations:
 - Click actions in the browser are not supported (e.g., "save as")
-- State is ignored
+- Browser-only interactions are not replayed

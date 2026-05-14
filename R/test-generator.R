@@ -106,8 +106,7 @@ makeTestsFromExamples <- function(path, module.dir, source, sanitize = FALSE,
       sanitize        = sanitize,
       overwrite       = overwrite,
       copyToJaspfiles = TRUE,
-      pkgAnalyses     = pkgAnalyses,
-      forceEncode     = forceEncode
+      pkgAnalyses     = pkgAnalyses
     )
 
     .printTestGenerationSummary(result$created, result$skipped, result$copied, "other")
@@ -166,8 +165,7 @@ makeTestsFromExamples <- function(path, module.dir, source, sanitize = FALSE,
       sanitize        = sanitize,
       overwrite       = overwrite,
       copyToJaspfiles = FALSE,
-      pkgAnalyses     = pkgAnalyses,
-      forceEncode     = forceEncode
+      pkgAnalyses     = pkgAnalyses
     )
     createdFiles <- c(createdFiles, result$created)
     skippedFiles <- c(skippedFiles, result$skipped)
@@ -257,8 +255,7 @@ readModuleAnalysisNames <- function(module.dir) {
 # collect created/skipped/copied paths, and report per-file progress.
 # Returns a list with components $created, $skipped, $copied.
 .processJaspFiles <- function(jaspFiles, module.dir, sourceFolder, sanitize,
-                              overwrite, copyToJaspfiles, pkgAnalyses,
-                              forceEncode) {
+                              overwrite, copyToJaspfiles, pkgAnalyses) {
   createdFiles <- character(0)
   skippedFiles <- character(0)
   copiedFiles  <- character(0)
@@ -274,8 +271,7 @@ readModuleAnalysisNames <- function(module.dir) {
           sanitize        = sanitize,
           overwrite       = overwrite,
           copyToJaspfiles = copyToJaspfiles,
-          pkgAnalyses     = pkgAnalyses,
-          forceEncode     = forceEncode
+          pkgAnalyses     = pkgAnalyses
         )
         if (!is.null(result)) {
           if (!is.null(attr(result, "copiedTo"))) {
@@ -504,15 +500,10 @@ generateExampleTestFileContent <- function(baseName, sanitizedName, sourceFolder
 #' @param sourceFolder String indicating the source folder: \code{"library"},
 #'   \code{"verified"}, or \code{"other"}.
 #' @param results The analysis results.
-#' @param forceEncode Compatibility argument retained for older callers. Supplying
-#'   a non-`NULL` value now aborts.
-#'
 #' @return Character string with the test_that block.
 #' @keywords internal
 generateExampleTestBlock <- function(analysisName, analysisIndex, totalAnalyses, jaspFileName,
-                                     sourceFolder, results, forceEncode = NULL) {
-  .rejectForceEncodeArgument(forceEncode)
-
+                                     sourceFolder, results) {
   # Extract tests from results
   tests <- tryCatch(
     {
@@ -589,15 +580,10 @@ generateExampleTestBlock <- function(analysisName, analysisIndex, totalAnalyses,
 #' @param jaspFileName Name of the JASP file.
 #' @param sourceFolder String indicating the source folder: \code{"library"},
 #'   \code{"verified"}, or \code{"other"}.
-#' @param forceEncode Compatibility argument retained for older callers. Supplying
-#'   a non-`NULL` value now aborts.
-#'
 #' @return Character string with the test_that block.
 #' @keywords internal
 generateExampleTestBlockBasic <- function(analysisName, analysisIndex, totalAnalyses, jaspFileName,
-                                          sourceFolder, forceEncode = NULL) {
-  .rejectForceEncodeArgument(forceEncode)
-
+                                          sourceFolder) {
   lines <- character(0)
 
   testDesc <- .generatedExampleTestDescription(

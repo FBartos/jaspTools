@@ -192,26 +192,8 @@ test_that("forceEncode transition argument fails loudly", {
   )
 
   expect_error(
-    jaspTools:::generateExampleTestBlock(
-      "Analysis",
-      analysisIndex = 1L,
-      totalAnalyses = 1L,
-      jaspFileName = "analysis.jasp",
-      sourceFolder = "other",
-      results = list(results = list()),
-      forceEncode = "model"
-    ),
-    "no longer supported",
-    fixed = TRUE
-  )
-
-  expect_error(
-    jaspTools:::generateExampleTestBlockBasic(
-      "Analysis",
-      analysisIndex = 1L,
-      totalAnalyses = 1L,
-      jaspFileName = "analysis.jasp",
-      sourceFolder = "other",
+    jaspTools::makeTestsFromExamples(
+      module.dir = moduleDir,
       forceEncode = "model"
     ),
     "no longer supported",

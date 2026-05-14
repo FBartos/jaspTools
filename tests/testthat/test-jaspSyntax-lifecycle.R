@@ -471,31 +471,6 @@ test_that("analysis result decoding delegates plain results to jaspSyntax", {
   expect_equal(observed$requiredArgs, "results")
 })
 
-test_that("column decoding wrapper calls the current jaspSyntax API", {
-  observedArgs <- NULL
-  observedNames <- NULL
-  restore <- localJaspToolsBinding(
-    ".jaspSyntaxCall",
-    function(names, args = list(), required = TRUE,
-             feature = "jaspSyntax bridge API",
-             requiredArgs = names(args),
-             requiredArgGroups = list()) {
-      observedNames <<- names
-      observedArgs <<- args
-      c("decodedA", "decodedB")
-    }
-  )
-  on.exit(restore(), add = TRUE)
-
-  decoded <- jaspTools:::.jaspSyntaxDecodeColumnNames(c("encodedA", "encodedB"), strict = TRUE)
-
-  expect_equal(decoded, c("decodedA", "decodedB"))
-  expect_equal(observedNames, "decodeColumnNames")
-  expect_equal(observedArgs$columnNames, c("encodedA", "encodedB"))
-  expect_null(observedArgs$x)
-  expect_true(observedArgs$strict)
-})
-
 test_that("jaspSyntax bridge wrapper rejects missing required arguments", {
   oldLoadAnalysisDataset <- function(dataset) dataset
 

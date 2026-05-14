@@ -10,8 +10,7 @@ generateExampleTestBlock(
   totalAnalyses,
   jaspFileName,
   sourceFolder,
-  results,
-  forceEncode = NULL
+  results
 )
 }
 \arguments{
@@ -27,9 +26,6 @@ generateExampleTestBlock(
 \code{"verified"}, or \code{"other"}.}
 
 \item{results}{The analysis results.}
-
-\item{forceEncode}{Compatibility argument retained for older callers. Supplying
-a non-\code{NULL} value now aborts.}
 }
 \value{
 Character string with the test_that block.
