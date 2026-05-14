@@ -19,8 +19,8 @@
 #' \code{analysisOptions}).
 #' @param view Boolean indicating whether to view the results in a webbrowser.
 #' @param quiet Boolean indicating whether to suppress messages from the
-#' analysis and native QML bridge. Quiet runs are evaluated in a subprocess so
-#' native Desktop logging does not clutter the calling R session.
+#' analysis. Quiet runs are evaluated in a subprocess to contain native bridge
+#' crashes and Desktop logging.
 #' @param makeTests Boolean indicating whether to create testthat unit tests and print them to the terminal.
 #' @param modulePath Optional path to the module checkout that should be used
 #'   for QML resolution and wrapped execution. When omitted, jaspTools first
@@ -185,25 +185,21 @@ runAnalysisInSubprocess <- function(name, dataset, options, view, quiet,
   )
 
   subprocessResult <- .jaspToolsRunSubprocess(
-    prefix = "jaspTools-runAnalysis-",
+    task = "runAnalysis",
     payload = payload,
-    scriptLines = runAnalysisSubprocessScript(),
-    failureMessage = "`runAnalysis()` subprocess failed before returning a result",
-    launcher = launchRunAnalysisSubprocess,
-    readResult = function(path) suppressPackageStartupMessages(readRDS(path)),
+    failureMessage = "`runAnalysis()` subprocess failed",
     isError = function(result) {
       inherits(.runAnalysisSubprocessResult(result), "jaspTools.subprocessError")
     }
   )
+
   if (is.list(subprocessResult) && !is.null(subprocessResult$lastResults))
     .setInternal("lastResults", subprocessResult$lastResults)
 
   restoreSubprocessHtmlFiles(subprocessResult$htmlFiles)
 
   result <- .runAnalysisSubprocessResult(subprocessResult)
-
   replaySubprocessWarnings(subprocessResult$warnings)
-
   .stopIfJaspToolsSubprocessError(result)
 
   viewRunAnalysisResults(result, view)
@@ -221,36 +217,11 @@ runAnalysisInSubprocess <- function(name, dataset, options, view, quiet,
   subprocessResult
 }
 
-launchRunAnalysisSubprocess <- function(scriptPath, inputPath, outputPath, logPath) {
-  .jaspToolsLaunchSubprocess(scriptPath, inputPath, outputPath, logPath)
-}
-
 viewRunAnalysisResults <- function(results, enabled) {
   if (!isTRUE(enabled))
     return(invisible(NULL))
 
   get("view", envir = asNamespace("jaspTools"), inherits = FALSE)(results)
-}
-
-runAnalysisSubprocessScript <- function() {
-  .jaspToolsSubprocessScript(
-    beforeResultLines = "warnings <- character(0)",
-    resultLines = c(
-      "result <- tryCatch(",
-      "  withCallingHandlers(",
-      "    do.call(jaspTools::runAnalysis, payload$args),",
-      "    warning = function(w) {",
-      "      warnings <<- c(warnings, conditionMessage(w))",
-      "      tryInvokeRestart('muffleWarning')",
-      "    }",
-      "  ),",
-      "  error = .jaspToolsSubprocessError",
-      ")",
-      "lastResults <- tryCatch(jaspTools:::.getInternal('lastResults'), error = function(e) NULL)",
-      "htmlFiles <- tryCatch(jaspTools:::collectSubprocessHtmlFiles(), error = function(e) NULL)"
-    ),
-    saveLines = "saveRDS(list(result = result, lastResults = lastResults, htmlFiles = htmlFiles, warnings = unique(warnings)), args[[2L]])"
-  )
 }
 
 replaySubprocessWarnings <- function(warnings) {

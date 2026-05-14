@@ -28,8 +28,8 @@ By default the directory in Resources is checked first, unless called within a t
 \item{view}{Boolean indicating whether to view the results in a webbrowser.}
 
 \item{quiet}{Boolean indicating whether to suppress messages from the
-analysis and native QML bridge. Quiet runs are evaluated in a subprocess so
-native Desktop logging does not clutter the calling R session.}
+analysis. Quiet runs are evaluated in a subprocess to contain native bridge
+crashes and Desktop logging.}
 
 \item{makeTests}{Boolean indicating whether to create testthat unit tests and print them to the terminal.}
 

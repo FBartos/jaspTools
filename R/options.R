@@ -101,10 +101,6 @@ analysisOptions <- function(source, modulePath = NULL) {
 }
 
 analysisOptionsFromQMLFile <- function(analysis, modulePath = NULL) {
-  if (analysisOptionsShouldUseSubprocess()) {
-    return(analysisOptionsFromQMLFileSubprocess(analysis, modulePath = modulePath))
-  }
-
   modulePath <- .modulePathForAnalysisName(analysis, modulePath)
   options <- jaspSyntax::readDefaultAnalysisOptions(
     modulePath = modulePath,
@@ -117,41 +113,6 @@ analysisOptionsFromQMLFile <- function(analysis, modulePath = NULL) {
   attr(options, "modulePath") <- normalizePath(modulePath, winslash = "/", mustWork = FALSE)
 
   return(options)
-}
-
-analysisOptionsShouldUseSubprocess <- function() {
-  isTRUE(getOption("jaspTools.analysisOptions.subprocess", TRUE)) &&
-    !identical(Sys.getenv("JASPTOOLS_ANALYSIS_OPTIONS_CHILD"), "true")
-}
-
-analysisOptionsFromQMLFileSubprocess <- function(analysis, modulePath = NULL) {
-  payload <- .jaspToolsSubprocessPayload(
-    extra = list(analysis = analysis, modulePath = modulePath),
-    env = .jaspToolsSubprocessEnv("JASPTOOLS_ANALYSIS_OPTIONS_CHILD")
-  )
-
-  result <- .jaspToolsRunSubprocess(
-    prefix = "jaspTools-analysisOptions-",
-    payload = payload,
-    scriptLines = analysisOptionsSubprocessScript(),
-    failureMessage = "`analysisOptions()` subprocess failed before returning options",
-    isError = function(result) inherits(result, "jaspTools.subprocessError")
-  )
-
-  .stopIfJaspToolsSubprocessError(result)
-  result
-}
-
-analysisOptionsSubprocessScript <- function() {
-  .jaspToolsSubprocessScript(
-    resultLines = c(
-      "result <- tryCatch(",
-      "  jaspTools:::analysisOptionsFromQMLFile(payload$analysis, modulePath = payload$modulePath),",
-      "  error = .jaspToolsSubprocessError",
-      ")"
-    ),
-    saveLines = "saveRDS(result, args[[2L]])"
-  )
 }
 
 .looksLikeMissingFilePath <- function(source) {
@@ -287,17 +248,18 @@ analysisRuntimeOptions <- function(file, modulePath = NULL) {
     modulePath,
     expectedNames = expectedNames,
     context = paste0(
-      "analysis `", record[["name"]] %||% "<unknown>",
-      "` in module `", record[["moduleName"]] %||% "<unknown>", "`"
+      "analysis `", .recordLabel(record, "name"),
+      "` in module `", .recordLabel(record, "moduleName"), "`"
     )
   )
 }
 
-`%||%` <- function(x, y) {
-  if (is.null(x) || length(x) == 0L || is.na(x[[1L]]) || !nzchar(x[[1L]]))
-    return(y)
+.recordLabel <- function(record, field) {
+  value <- record[[field]]
+  if (is.null(value) || length(value) == 0L || is.na(value[[1L]]) || !nzchar(value[[1L]]))
+    return("<unknown>")
 
-  as.character(x[[1L]])
+  as.character(value[[1L]])
 }
 
 .normalizeSingleModulePath <- function(modulePath, expectedNames = character(0),
@@ -308,7 +270,7 @@ analysisRuntimeOptions <- function(file, modulePath = NULL) {
     matchIndex <- match(expectedNames, pathNames, nomatch = 0L)
     matchIndex <- matchIndex[matchIndex > 0L]
     if (length(matchIndex) > 0L)
-        return(.normalizeModulePathValue(modulePath, matchIndex[[1L]]))
+      return(.normalizeModulePathValue(modulePath, matchIndex[[1L]]))
 
     usableNames <- pathNames[!is.na(pathNames) & nzchar(pathNames)]
     stop(

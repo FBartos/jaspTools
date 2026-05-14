@@ -67,9 +67,6 @@ test_that("analysisOptions preserves JSON options without native replay", {
 })
 
 test_that("analysisOptions for analysis names requests editable unprepared defaults", {
-  restoreOption <- localJaspToolsOptions(list(jaspTools.analysisOptions.subprocess = FALSE))
-  on.exit(restoreOption(), add = TRUE)
-
   observed <- NULL
 
   restoreTools <- localJaspToolsBinding("getModulePathFromRFunction", function(analysis) {
@@ -106,9 +103,6 @@ test_that("analysisOptions for analysis names requests editable unprepared defau
 })
 
 test_that("analysisOptions for analysis names honors explicit modulePath", {
-  restoreOption <- localJaspToolsOptions(list(jaspTools.analysisOptions.subprocess = FALSE))
-  on.exit(restoreOption(), add = TRUE)
-
   observed <- NULL
 
   restoreTools <- localJaspToolsBinding("getModulePathFromRFunction", function(analysis) {
@@ -133,9 +127,6 @@ test_that("analysisOptions for analysis names honors explicit modulePath", {
 })
 
 test_that("analysisOptions for analysis names accepts module-name keyed modulePath", {
-  restoreOption <- localJaspToolsOptions(list(jaspTools.analysisOptions.subprocess = FALSE))
-  on.exit(restoreOption(), add = TRUE)
-
   observed <- NULL
 
   restoreTools <- localJaspToolsBinding("getModulePathFromRFunction", function(analysis) {
@@ -170,42 +161,6 @@ test_that("analysisOptions for analysis names accepts module-name keyed modulePa
   expect_equal(observed$modulePath, "C:/fake/module")
   expect_equal(observed$analysisName, "FakeAnalysis")
   expect_equal(attr(opts, "modulePath"), "C:/fake/module")
-})
-
-test_that("analysisOptions subprocess delegates shared child scaffold", {
-  observed <- NULL
-  expected <- list(variable = "x")
-
-  restore <- localJaspToolsBinding(".jaspToolsRunSubprocess", function(prefix, payload, scriptLines,
-                                                                       failureMessage, isError, ...) {
-    observed <<- list(
-      prefix = prefix,
-      payload = payload,
-      scriptLines = scriptLines,
-      failureMessage = failureMessage,
-      isError = isError
-    )
-    expected
-  })
-  on.exit(restore(), add = TRUE)
-
-  result <- jaspTools:::analysisOptionsFromQMLFileSubprocess(
-    "FakeAnalysis",
-    modulePath = "C:/fake/module"
-  )
-
-  expect_identical(result, expected)
-  expect_equal(observed$prefix, "jaspTools-analysisOptions-")
-  expect_equal(observed$payload$analysis, "FakeAnalysis")
-  expect_equal(observed$payload$modulePath, "C:/fake/module")
-  expect_identical(observed$payload$env$JASPTOOLS_ANALYSIS_OPTIONS_CHILD, "true")
-  expect_match(observed$failureMessage, "analysisOptions", fixed = TRUE)
-  expect_false(observed$isError(expected))
-  expect_true(any(grepl("pkgload::load_all", observed$scriptLines, fixed = TRUE)))
-  expect_true(any(grepl(".jaspToolsRestoreROptionsForChild", observed$scriptLines, fixed = TRUE)))
-  expect_true(any(grepl(".jaspToolsRestorePkgOptionsForChild", observed$scriptLines, fixed = TRUE)))
-  expect_true(any(grepl(".initOutputDirs", observed$scriptLines, fixed = TRUE)))
-  expect_true(any(grepl(".jaspToolsSubprocessError", observed$scriptLines, fixed = TRUE)))
 })
 
 test_that("analysisOptions forwards modulePath for .jasp sources", {

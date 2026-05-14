@@ -193,30 +193,10 @@ getMissingValuesDiffSizeTables <- function(test, ref, cellNames) {
 tableListToAnnotatedCharacterVector <- function(tableList, cellNames=NULL) {
     fullValues <- unlist(tableList)
     tableVec <- as.character(unlist(lapply(tableList, roundToPrecision)))
-    tableVec <- canonicalizeJaspColumnTokens(tableVec)
-    names(tableVec) <- canonicalizeJaspColumnTokens(as.character(fullValues))
+    names(tableVec) <- as.character(fullValues)
     attr(tableVec, "cellNames") <- cellNames
 
     return(tableVec)
-}
-
-canonicalizeJaspColumnTokens <- function(x) {
-  if (!is.character(x) || length(x) == 0L)
-    return(x)
-
-  tokenPattern <- "(JaspColumn_[[:alnum:]_]+_Encoded|jaspColumn[0-9]+)"
-  tokens <- unlist(regmatches(x, gregexpr(tokenPattern, x, perl = TRUE)), use.names = FALSE)
-  tokens <- unique(tokens[nzchar(tokens)])
-
-  if (length(tokens) == 0L)
-    return(x)
-
-  replacements <- stats::setNames(paste0("<jaspColumn", seq_along(tokens), ">"), tokens)
-  for (token in tokens) {
-    x <- gsub(token, replacements[[token]], x, fixed = TRUE)
-  }
-
-  x
 }
 
 tableValuesMatch <- function(refValue, testValue) {

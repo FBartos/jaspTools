@@ -682,20 +682,6 @@ test_that("subprocess payload carries selected R options", {
   expect_identical(payload$rOptions$jaspLegacyRngKind, FALSE)
 })
 
-test_that("subprocess runner captures warnings without child quiet suppression", {
-  script <- jaspTools:::runAnalysisSubprocessScript()
-
-  expect_true(any(grepl("pkgload::load_all", script, fixed = TRUE)))
-  expect_true(any(grepl(".jaspToolsRestoreROptionsForChild", script, fixed = TRUE)))
-  expect_true(any(grepl(".jaspToolsRestorePkgOptionsForChild", script, fixed = TRUE)))
-  expect_true(any(grepl("setupCompleteOverride", script, fixed = TRUE)))
-  expect_true(any(grepl(".initOutputDirs", script, fixed = TRUE)))
-  expect_true(any(grepl(".jaspToolsSubprocessError", script, fixed = TRUE)))
-  expect_true(any(grepl("withCallingHandlers", script, fixed = TRUE)))
-  expect_true(any(grepl("warnings <<- c\\(warnings, conditionMessage\\(w\\)\\)", script)))
-  expect_true(any(grepl("warnings = unique\\(warnings\\)", script)))
-})
-
 test_that("runAnalysis sends processed results to the viewer", {
   rawJson <- '{"status":"complete","results":{"table":{"data":[{"name":"JaspColumn_1_Encoded"}]}}}'
   processed <- list(
@@ -754,24 +740,20 @@ test_that("subprocess runAnalysis parent views returned processed results", {
     results = list(table = list(data = list(list(name = "decoded name"))))
   )
   viewed <- NULL
+  observedPayload <- NULL
 
   restore <- localJaspToolsBindings(
-    launchRunAnalysisSubprocess = function(scriptPath, inputPath, outputPath, logPath) {
-      payload <- readRDS(inputPath)
-      expect_false(payload$args$view)
-      expect_false(payload$args$makeTests)
-      expect_identical(payload$env$JASPTOOLS_RUNANALYSIS_CHILD, "true")
-      expect_true(all(c("NOT_CRAN", "LANG", "LANGUAGE") %in% names(payload$env)))
-      saveRDS(
-        list(
-          result = processed,
-          lastResults = rawJson,
-          htmlFiles = list(files = list()),
-          warnings = character(0)
-        ),
-        outputPath
+    .jaspToolsRunSubprocess = function(task, payload, failureMessage, isError) {
+      observedPayload <<- payload
+      expect_equal(task, "runAnalysis")
+      expect_match(failureMessage, "runAnalysis", fixed = TRUE)
+      expect_false(isError(list(result = processed)))
+      list(
+        result = processed,
+        lastResults = rawJson,
+        htmlFiles = list(files = list()),
+        warnings = character(0)
       )
-      0L
     },
     view = function(results) {
       viewed <<- results
@@ -789,6 +771,10 @@ test_that("subprocess runAnalysis parent views returned processed results", {
     makeTests = FALSE
   )
 
+  expect_false(observedPayload$args$view)
+  expect_false(observedPayload$args$makeTests)
+  expect_identical(observedPayload$env$JASPTOOLS_RUNANALYSIS_CHILD, "true")
+  expect_true(all(c("NOT_CRAN", "LANG", "LANGUAGE") %in% names(observedPayload$env)))
   expect_identical(result, processed)
   expect_identical(viewed, processed)
   expect_identical(jaspTools:::.getInternal("lastResults"), rawJson)
@@ -852,9 +838,6 @@ test_that("run argument construction rejects analysis and module metadata mismat
 })
 
 test_that("runAnalysis rejects prepared runtime options", {
-  restoreOption <- localJaspToolsOptions(list(jaspTools.runAnalysis.subprocess = FALSE))
-  on.exit(restoreOption(), add = TRUE)
-
   observed <- list(initCalled = FALSE, fetchCalled = FALSE)
 
   restore <- localJaspToolsBindings(
@@ -884,7 +867,7 @@ test_that("runAnalysis rejects prepared runtime options", {
 test_that("real saved .jasp options replay once through runAnalysis with extracted data", {
   testthat::skip_if_not(
     identical(Sys.getenv("JASPTOOLS_RUN_REAL_DESCRIPTIVES"), "true"),
-    "set JASPTOOLS_RUN_REAL_DESCRIPTIVES=true to run local jaspDescriptives subprocess integration tests"
+    "set JASPTOOLS_RUN_REAL_DESCRIPTIVES=true to run local jaspDescriptives native integration tests"
   )
   jaspFile <- file.path(testthat::test_path(), "..", "JASPFiles", "debug-descriptives.jasp")
   testthat::skip_if_not(file.exists(jaspFile), "debug descriptives .jasp fixture is unavailable")
@@ -951,7 +934,7 @@ test_that("real saved .jasp options replay once through runAnalysis with extract
 test_that("real QML defaults can be edited and replayed through QML once", {
   testthat::skip_if_not(
     identical(Sys.getenv("JASPTOOLS_RUN_REAL_DESCRIPTIVES"), "true"),
-    "set JASPTOOLS_RUN_REAL_DESCRIPTIVES=true to run local jaspDescriptives subprocess integration tests"
+    "set JASPTOOLS_RUN_REAL_DESCRIPTIVES=true to run local jaspDescriptives native integration tests"
   )
   jaspFile <- file.path(testthat::test_path(), "..", "JASPFiles", "debug-descriptives.jasp")
   testthat::skip_if_not(file.exists(jaspFile), "debug descriptives .jasp fixture is unavailable")
@@ -1008,7 +991,7 @@ test_that("real QML defaults can be edited and replayed through QML once", {
 test_that("real runtime .jasp options are inspection-only", {
   testthat::skip_if_not(
     identical(Sys.getenv("JASPTOOLS_RUN_REAL_DESCRIPTIVES"), "true"),
-    "set JASPTOOLS_RUN_REAL_DESCRIPTIVES=true to run local jaspDescriptives subprocess integration tests"
+    "set JASPTOOLS_RUN_REAL_DESCRIPTIVES=true to run local jaspDescriptives native integration tests"
   )
   jaspFile <- file.path(testthat::test_path(), "..", "JASPFiles", "debug-descriptives.jasp")
   testthat::skip_if_not(file.exists(jaspFile), "debug descriptives .jasp fixture is unavailable")

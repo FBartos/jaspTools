@@ -12,6 +12,7 @@ License: GNU General Public License
 Encoding: UTF-8
 LazyData: true
 Imports:
+  callr,
   cli,
   data.table,
   httr,
