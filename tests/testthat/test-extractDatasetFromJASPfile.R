@@ -73,15 +73,16 @@ test_that("extractDatasetFromJASPFile handles binary columns correctly", {
   df <- extractDatasetFromJASPFile(jaspFile)
   csv <- read.csv(csvFile, stringsAsFactors = FALSE, check.names = FALSE)
 
-  # Binary columns like contBinom should have correct 0/1 values
-  expect_equal(sort(unique(na.omit(df[["contBinom"]]))), c(0L, 1L),
+  # jaspSyntax owns JASP's saved-dataset reconstruction. Binary nominal values
+  # are returned as labels rather than coerced by jaspTools.
+  expect_equal(sort(unique(na.omit(df[["contBinom"]]))), c("0", "1"),
                info = "contBinom should have values 0 and 1")
-  expect_equal(df[["contBinom"]], csv[["contBinom"]],
+  expect_equal(df[["contBinom"]], as.character(csv[["contBinom"]]),
                info = "contBinom values should match CSV")
 
-  expect_equal(sort(unique(na.omit(df[["debBinMiss20"]]))), c(0L, 1L),
+  expect_equal(sort(unique(na.omit(df[["debBinMiss20"]]))), c("0", "1"),
                info = "debBinMiss20 should have values 0 and 1 (with NAs)")
-  expect_equal(df[["debBinMiss20"]], csv[["debBinMiss20"]],
+  expect_equal(df[["debBinMiss20"]], as.character(csv[["debBinMiss20"]]),
                info = "debBinMiss20 values should match CSV")
 })
 
@@ -156,10 +157,10 @@ test_that("extractDatasetFromJASPFile handles ordinal columns correctly", {
   df <- extractDatasetFromJASPFile(jaspFile)
   csv <- read.csv(csvFile, stringsAsFactors = FALSE, check.names = FALSE)
 
-  # facFive is ordinal with values 1-5
-  expect_equal(sort(unique(df[["facFive"]])), 1:5,
+  # Ordinal labels are returned by jaspSyntax without jaspTools-side coercion.
+  expect_equal(sort(unique(df[["facFive"]])), as.character(1:5),
                info = "facFive should have values 1-5")
-  expect_equal(df[["facFive"]], csv[["facFive"]],
+  expect_equal(df[["facFive"]], as.character(csv[["facFive"]]),
                info = "facFive values should match CSV")
 })
 

@@ -50,7 +50,7 @@
 
 .checkUpdatesJaspCorePkgs <- function() {
   hasUpdates <- NULL
-  corePkgs <- c("jaspGraphs", "jaspBase", "jaspTools")
+  corePkgs <- c("jaspGraphs", "jaspBase", "jaspSyntax", "jaspTools")
   for (pkg in corePkgs) {
     suppressWarnings(try(silent = TRUE, {
       localVer <- packageVersion(pkg)

@@ -106,7 +106,6 @@
   if (is.list(payload$rOptions) && length(payload$rOptions) > 0L)
     do.call(options, payload$rOptions)
 
-  .jaspToolsLoadForSubprocess(payload$sourcePath)
   .jaspToolsRestorePkgOptionsForSubprocess(payload$pkgOptions)
   invisible(NULL)
 }
