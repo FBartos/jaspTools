@@ -76,6 +76,16 @@ localDescriptivesModuleOptions <- function(modulePath) {
   ))
 }
 
+localRealDescriptivesModulePath <- function() {
+  candidates <- c(
+    Sys.getenv("JASPTOOLS_REAL_DESCRIPTIVES_MODULE", unset = ""),
+    file.path(testthat::test_path(), "..", "..", "..", "jaspDescriptives")
+  )
+  candidates <- candidates[nzchar(candidates)]
+  candidates <- normalizePath(candidates, winslash = "/", mustWork = FALSE)
+  candidates[dir.exists(candidates)][1L]
+}
+
 disableDescriptivesPlotOptions <- function(options) {
   plotFlags <- c(
     "boxPlot",
@@ -757,11 +767,11 @@ test_that("subprocess runAnalysis parent views returned processed results", {
 
 test_that("native QML replay accepts saved bound scalar options", {
   fixtureModule <- normalizePath(
-    file.path("C:/JASP-Packages/jaspSyntax/tests/testthat/fixtures/minimalModule"),
+    file.path(testthat::test_path(), "fixtures", "minimalModule"),
     winslash = "/",
     mustWork = FALSE
   )
-  testthat::skip_if_not(dir.exists(fixtureModule), "jaspSyntax minimal module fixture is unavailable")
+  testthat::skip_if_not(dir.exists(fixtureModule), "minimal module fixture is unavailable")
 
   opts <- jaspSyntax::readAnalysisOptionsFromQml(
     fixtureModule,
@@ -849,8 +859,11 @@ test_that("real saved .jasp options replay once through runAnalysis with extract
   testthat::skip_if_not_installed("jaspDescriptives")
   skip_if_no_jaspSyntax_dataset_api()
 
-  modulePath <- normalizePath("C:/JASP-Packages/jaspDescriptives", winslash = "/", mustWork = FALSE)
-  testthat::skip_if_not(dir.exists(modulePath), "local jaspDescriptives checkout is unavailable")
+  modulePath <- localRealDescriptivesModulePath()
+  testthat::skip_if_not(
+    !is.na(modulePath),
+    "set JASPTOOLS_REAL_DESCRIPTIVES_MODULE or keep jaspDescriptives beside jaspTools"
+  )
   skip_if_descriptives_qml_has_known_pareto_bug(modulePath)
 
   restoreRngOption <- localJaspToolsOptions(list(jaspLegacyRngKind = FALSE))
@@ -916,8 +929,11 @@ test_that("real QML defaults can be edited and replayed through QML once", {
   testthat::skip_if_not_installed("jaspDescriptives")
   skip_if_no_jaspSyntax_dataset_api()
 
-  modulePath <- normalizePath("C:/JASP-Packages/jaspDescriptives", winslash = "/", mustWork = FALSE)
-  testthat::skip_if_not(dir.exists(modulePath), "local jaspDescriptives checkout is unavailable")
+  modulePath <- localRealDescriptivesModulePath()
+  testthat::skip_if_not(
+    !is.na(modulePath),
+    "set JASPTOOLS_REAL_DESCRIPTIVES_MODULE or keep jaspDescriptives beside jaspTools"
+  )
   skip_if_descriptives_qml_has_known_pareto_bug(modulePath)
 
   restoreRngOption <- localJaspToolsOptions(list(jaspLegacyRngKind = FALSE))
@@ -972,8 +988,11 @@ test_that("real runtime .jasp options are inspection-only", {
   testthat::skip_if_not(file.exists(jaspFile), "debug descriptives .jasp fixture is unavailable")
   testthat::skip_if_not_installed("jaspDescriptives")
 
-  modulePath <- normalizePath("C:/JASP-Packages/jaspDescriptives", winslash = "/", mustWork = FALSE)
-  testthat::skip_if_not(dir.exists(modulePath), "local jaspDescriptives checkout is unavailable")
+  modulePath <- localRealDescriptivesModulePath()
+  testthat::skip_if_not(
+    !is.na(modulePath),
+    "set JASPTOOLS_REAL_DESCRIPTIVES_MODULE or keep jaspDescriptives beside jaspTools"
+  )
 
   restorePkgOptions <- localDescriptivesModuleOptions(modulePath)
   on.exit(restorePkgOptions(), add = TRUE)

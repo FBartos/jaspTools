@@ -110,18 +110,6 @@
   invisible(NULL)
 }
 
-.jaspToolsLoadForSubprocess <- function(sourcePath) {
-  if (!is.null(sourcePath) && is.character(sourcePath) && length(sourcePath) == 1L &&
-      file.exists(file.path(sourcePath, "R", "run.R"))) {
-    if (!requireNamespace("pkgload", quietly = TRUE))
-      stop("pkgload is required to run jaspTools child processes from a source checkout", call. = FALSE)
-
-    pkgload::load_all(sourcePath, quiet = TRUE)
-  } else {
-    suppressPackageStartupMessages(library(jaspTools))
-  }
-}
-
 .jaspToolsRestorePkgOptionsForSubprocess <- function(pkgOptions) {
   if (!is.list(pkgOptions) || length(pkgOptions) == 0L)
     return(invisible(NULL))
